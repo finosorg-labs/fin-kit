@@ -1,0 +1,9 @@
+#ifndef FIN_KIT_VERSION_H
+#define FIN_KIT_VERSION_H
+
+#define FC_VERSION_MAJOR @fin-kit_VERSION_MAJOR@
+#define FC_VERSION_MINOR @fin-kit_VERSION_MINOR@
+#define FC_VERSION_PATCH @fin-kit_VERSION_PATCH@
+#define FC_VERSION_STRING "@fin-kit_VERSION@"
+
+#endif /* FIN_KIT_VERSION_H */

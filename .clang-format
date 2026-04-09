@@ -1,0 +1,37 @@
+# =============================================================================
+# fin-kit Code Formatting Configuration
+# =============================================================================
+# Usage: clang-format --style=file -i src/file.c
+# =============================================================================
+
+BasedOnStyle: LLVM
+Language: C
+ColumnLimit: 120
+
+IndentWidth: 4
+UseTab: Never
+
+BreakBeforeBraces: K&R
+
+PointerAlignment: Left
+
+PragmaOnce: true
+
+SortIncludes: true
+
+IndentPP directives: AfterHash
+
+IndentCaseLabels: false
+
+IndentNamespace: false
+
+IndentAccessSpecifiers: false
+
+IndentWrappedFunctionNames: false
+
+SpaceBeforeParens: Never
+SpaceAfterCStyleCast: true
+
+ReflowComments: true
+
+CommentPragmas: '^'
