@@ -139,6 +139,16 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/exchange)
     add_subdirectory(src/exchange)
 endif()
 
+# Test suite
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests AND FC_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+
+# Benchmark suite
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks AND FC_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
 # Install public headers
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
