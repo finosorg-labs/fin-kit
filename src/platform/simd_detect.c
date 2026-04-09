@@ -199,20 +199,6 @@ const char* fc_simd_level_string(fc_simd_level_t level) {
     }
 }
 
-int fc_has_simd_level(fc_simd_level_t level) {
-    return g_fc_simd_level >= level;
-}
-
-size_t fc_simd_register_width(fc_simd_level_t level) {
-    switch (level) {
-        case FC_SIMD_SCALAR: return 8;
-        case FC_SIMD_SSE42:  return 16;
-        case FC_SIMD_AVX2:   return 32;
-        case FC_SIMD_AVX512: return 64;
-        default:              return 8;
-    }
-}
-
 size_t fc_simd_parallelism(fc_simd_level_t level) {
     switch (level) {
         case FC_SIMD_SCALAR: return 1;
@@ -221,4 +207,15 @@ size_t fc_simd_parallelism(fc_simd_level_t level) {
         case FC_SIMD_AVX512: return 8;
         default:              return 1;
     }
+}
+
+/* Private: detection without global side effect (safe for Go runtime init) */
+fc_simd_level_t fc_simd_detect_unsafe(void) {
+#if defined(FC_ARCH_X86) || defined(FC_ARCH_X86_64)
+    return fc_detect_simd_x86();
+#elif defined(FC_ARCH_ARM) || defined(FC_ARCH_ARM64)
+    return fc_detect_simd_arm();
+#else
+    return FC_SIMD_SCALAR;
+#endif
 }

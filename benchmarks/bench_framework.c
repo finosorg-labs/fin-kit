@@ -375,8 +375,6 @@ void fc_bench_run(
         result->throughput_gb_s = fc_bench_throughput_gb_s(result->data_size, result->elapsed_ms);
     }
 
-    result->enable_stats = config->enable_stats;
-
     /* Print result */
     if (!config->quiet && g_verbose) {
         fc_bench_result_print(result);

@@ -56,6 +56,9 @@ fc_simd_level_t fc_get_simd_level(void);
  */
 extern fc_simd_level_t g_fc_simd_level;
 
+/* Private: raw detection without global side effect (safe for Go runtime init) */
+extern fc_simd_level_t fc_simd_detect_unsafe(void);
+
 /**
  * @brief Get string description of SIMD level
  *
@@ -63,22 +66,6 @@ extern fc_simd_level_t g_fc_simd_level;
  * @return Level description string
  */
 const char* fc_simd_level_string(fc_simd_level_t level);
-
-/**
- * @brief Check if a specific SIMD level is supported
- *
- * @param level SIMD level to check
- * @return 1 if supported, 0 if not supported
- */
-int fc_has_simd_level(fc_simd_level_t level);
-
-/**
- * @brief Get SIMD register width in bytes
- *
- * @param level SIMD level
- * @return Register width in bytes
- */
-size_t fc_simd_register_width(fc_simd_level_t level);
 
 /**
  * @brief Get SIMD parallelism (number of doubles processable in parallel)
