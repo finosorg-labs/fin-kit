@@ -5,13 +5,19 @@
 # All builds run on Linux (ubuntu-24.04) via cross-compilation toolchain.
 #
 # Build matrix:
-#   - Linux native: GCC + Clang, Release + Debug
-#   - Windows amd64: cross-compiled via MinGW-w64
+#   - Linux native: GCC + Clang, Release
+#   - Windows amd64: cross-compiled via MinGW-w64, Release
+#
+# Output structure (all under build/):
+#   build/linux_amd64/{bin,lib}/
+#   build/windows_amd64/{bin,lib}/
+# Sanitizer/coverage/clang-tidy jobs use their own subtrees:
+#   build/sanitizer-asan/, build/coverage/, build/clang-tidy/
 #
 # Architecture:
 #   Stage 1 — Build:  Linux native + Windows cross-compile
-#   Stage 2 — QA:    Sanitizer / Coverage / Static analysis
-#   Stage 3 — Go:    Go module
+#   Stage 2 — QA:     Sanitizer / Coverage / Static analysis
+#   Stage 3 — Go:     Go module
 # =============================================================================
 
 name: fin-kit CI
@@ -29,37 +35,47 @@ concurrency:
 
 jobs:
   # ==========================================================================
-  # Stage 1 — Build
+  # Common — install all dependencies once, shared by all Linux jobs
+  # ==========================================================================
+
+  setup:
+    name: Setup
+    runs-on: ubuntu-24.04
+    outputs:
+      cached: 'true'
+    steps:
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc g++ clang cmake ninja-build make \
+            mingw-w64 lcov cppcheck clang-tidy
+
+  # ==========================================================================
+  # Stage 1a — Linux native build (Release, GCC + Clang)
   # ==========================================================================
 
   linux-build:
-    name: Linux / ${{ matrix.compiler }} / ${{ matrix.build_type }}
+    name: Linux / ${{ matrix.compiler }}
     runs-on: ubuntu-24.04
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
         compiler: [gcc, clang]
-        build_type: [Release, Debug]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build \
-            ${{ matrix.compiler == 'clang' && 'clang' || '' }}
-
       - name: Configure
         env:
-          CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+          CC: ${{ matrix.compiler }}
         run: |
           cmake -B build/linux_amd64 \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_BUILD_TYPE=Release \
             -DFC_BUILD_TESTS=ON \
-            -DFC_BUILD_BENCHMARKS=${{ matrix.build_type == 'Release' && 'ON' || 'OFF' }}
+            -DFC_BUILD_BENCHMARKS=ON
 
       - name: Build
         run: cmake --build build/linux_amd64 --parallel
@@ -67,29 +83,25 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build/linux_amd64
 
+  # ==========================================================================
+  # Stage 1b — Windows amd64 cross-compile (Release)
+  # ==========================================================================
+
   windows-cross:
     name: Windows amd64 (cross)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type: [Release, Debug]
+    needs: setup
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install MinGW-w64
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends mingw-w64 cmake make
 
       - name: Configure
         run: |
           cmake -B build/windows_amd64 \
             -G "Unix Makefiles" \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/x86_64-w64-mingw32.cmake \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain/x86_64-w64-mingw32.cmake \
             -DCMAKE_MAKE_PROGRAM=/usr/bin/make \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_BUILD_TYPE=Release \
             -DFC_BUILD_TESTS=ON \
             -DFC_BUILD_BENCHMARKS=ON
 
@@ -99,83 +111,151 @@ jobs:
       - name: Verify binary format
         run: |
           echo "=== Windows amd64 artifact ==="
-          file build/windows_amd64/lib/*.a 2>/dev/null || echo "(no artifacts)"
-          x86_64-w64-mingw32-objdump -f build/windows_amd64/lib/*.a 2>/dev/null | grep "file format" | head -3 || true
+          echo "bin:"
+          find build/windows_amd64/bin -type f 2>/dev/null | head -10 || echo "(empty)"
+          echo "lib:"
+          find build/windows_amd64/lib -type f 2>/dev/null | head -10 || echo "(empty)"
+          file build/windows_amd64/bin/*.exe 2>/dev/null | head -3 || true
+          x86_64-w64-mingw32-objdump -f build/windows_amd64/lib/*.a 2>/dev/null \
+            | grep "file format" | head -3 || true
 
   # ==========================================================================
-  # Stage 2 — Quality assurance
+  # Stage 2a — Sanitizers (ASan / USan / TSan / MSan) — always serial
   # ==========================================================================
 
-  sanitizer:
-    name: Sanitizer / ${{ matrix.type }} (Linux)
+  sanitizer-asan:
+    name: Sanitizer / ASan
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { type: ASan,  cc: gcc,   sanitizer: address }
-          - { type: USan,  cc: gcc,   sanitizer: undefined }
-          - { type: TSan,  cc: gcc,   sanitizer: thread }
-          - { type: MSan,  cc: clang, sanitizer: memory }
+    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build \
-            ${{ matrix.cc == 'clang' && 'clang' || '' }}
-
       - name: Configure
         env:
-          CC: ${{ matrix.cc }}
+          CC: gcc
         run: |
-          cmake -B build/linux_amd64 \
+          cmake -B build/sanitizer-asan \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DFC_BUILD_TESTS=ON \
             -DFC_BUILD_BENCHMARKS=OFF \
             -DFC_ENABLE_SANITIZERS=ON \
-            -DFC_SANITIZER_TYPE=${{ matrix.sanitizer }}
+            -DFC_SANITIZER_TYPE=address
 
       - name: Build
-        run: cmake --build build/linux_amd64 --parallel
+        run: cmake --build build/sanitizer-asan --parallel
 
       - name: Test
-        run: ctest --output-on-failure --test-dir build/linux_amd64
+        run: ctest --output-on-failure --test-dir build/sanitizer-asan
 
-  coverage:
-    name: Coverage (Linux)
+  sanitizer-usan:
+    name: Sanitizer / USan
     runs-on: ubuntu-24.04
+    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Configure
+        env:
+          CC: gcc
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential gcc cmake ninja-build lcov
+          cmake -B build/sanitizer-usan \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DFC_BUILD_TESTS=ON \
+            -DFC_BUILD_BENCHMARKS=OFF \
+            -DFC_ENABLE_SANITIZERS=ON \
+            -DFC_SANITIZER_TYPE=undefined
+
+      - name: Build
+        run: cmake --build build/sanitizer-usan --parallel
+
+      - name: Test
+        run: ctest --output-on-failure --test-dir build/sanitizer-usan
+
+  sanitizer-tsan:
+    name: Sanitizer / TSan
+    runs-on: ubuntu-24.04
+    needs: [setup, linux-build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: gcc
+        run: |
+          cmake -B build/sanitizer-tsan \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DFC_BUILD_TESTS=ON \
+            -DFC_BUILD_BENCHMARKS=OFF \
+            -DFC_ENABLE_SANITIZERS=ON \
+            -DFC_SANITIZER_TYPE=thread
+
+      - name: Build
+        run: cmake --build build/sanitizer-tsan --parallel
+
+      - name: Test
+        run: ctest --output-on-failure --test-dir build/sanitizer-tsan
+
+  sanitizer-msan:
+    name: Sanitizer / MSan
+    runs-on: ubuntu-24.04
+    needs: [setup, linux-build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: clang
+        run: |
+          cmake -B build/sanitizer-msan \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DFC_BUILD_TESTS=ON \
+            -DFC_BUILD_BENCHMARKS=OFF \
+            -DFC_ENABLE_SANITIZERS=ON \
+            -DFC_SANITIZER_TYPE=memory
+
+      - name: Build
+        run: cmake --build build/sanitizer-msan --parallel
+
+      - name: Test
+        run: ctest --output-on-failure --test-dir build/sanitizer-msan
+
+  # ==========================================================================
+  # Stage 2b — Coverage
+  # ==========================================================================
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    needs: [setup, linux-build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure
         run: |
-          cmake -B build/linux_amd64 \
+          cmake -B build/coverage \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Coverage \
             -DFC_BUILD_TESTS=ON \
             -DFC_BUILD_BENCHMARKS=OFF
 
       - name: Build
-        run: cmake --build build/linux_amd64 --parallel
+        run: cmake --build build/coverage --parallel
 
       - name: Test
-        run: ctest --output-on-failure --test-dir build/linux_amd64
+        run: ctest --output-on-failure --test-dir build/coverage
 
       - name: Generate coverage report
         run: |
-          lcov --capture --directory build/linux_amd64 --output-file coverage.info --no-external
+          lcov --capture --directory build/coverage --output-file coverage.info --no-external
           lcov --remove coverage.info '*/third_party/*' --output-file coverage.filtered.info
           lcov --list coverage.filtered.info
 
@@ -188,51 +268,44 @@ jobs:
           name: fin-kit-coverage
           fail_ci_if_error: false
 
+  # ==========================================================================
+  # Stage 2c — Static analysis
+  # ==========================================================================
+
   clang-tidy:
-    name: Static Analysis (Clang-Tidy)
+    name: Static / Clang-Tidy
     runs-on: ubuntu-24.04
+    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang cmake ninja-build clang-tidy
 
       - name: Configure
         env:
           CC: clang
           CXX: clang++
         run: |
-          cmake -B build/linux_amd64 \
+          cmake -B build/clang-tidy \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DFC_BUILD_TESTS=ON \
             -DFC_BUILD_BENCHMARKS=OFF
 
       - name: Build with clang-tidy
-        run: cmake --build build/linux_amd64 --parallel --target finkit 2>&1 | tee build.log
+        run: cmake --build build/clang-tidy --parallel --target finkit 2>&1 | tee build.log
 
       - name: Run clang-tidy
         run: |
           find src -name '*.c' -o -name '*.h' | \
-            xargs clang-tidy \
-              --quiet \
-              --export-fixes=fixes.yaml 2>&1
+            xargs clang-tidy --quiet --export-fixes=fixes.yaml 2>&1
 
   cppcheck:
-    name: Static Analysis (Cppcheck)
+    name: Static / Cppcheck
     runs-on: ubuntu-24.04
+    needs: [setup]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Cppcheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cppcheck
 
       - name: Run Cppcheck
         run: |
@@ -260,12 +333,15 @@ jobs:
           cache-dependency-path: go/fin-kit/go.sum
 
       - name: Build
+        working-directory: go/fin-kit
         run: go build ./...
 
       - name: Vet
+        working-directory: go/fin-kit
         run: go vet ./...
 
       - name: Test
+        working-directory: go/fin-kit
         run: go test ./...
 
   # ==========================================================================
@@ -274,8 +350,10 @@ jobs:
   build-summary:
     name: Summary
     needs: [
+      setup,
       linux-build, windows-cross,
-      sanitizer, coverage, clang-tidy, cppcheck, go-build
+      sanitizer-asan, sanitizer-usan, sanitizer-tsan, sanitizer-msan,
+      coverage, clang-tidy, cppcheck, go-build
     ]
     runs-on: ubuntu-latest
     if: always()
@@ -288,7 +366,10 @@ jobs:
           echo "|-------|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Build | linux-build | ${{ needs.linux-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | windows-cross | ${{ needs.windows-cross.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| QA    | sanitizer | ${{ needs.sanitizer.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| QA    | sanitizer-asan | ${{ needs.sanitizer-asan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| QA    | sanitizer-usan | ${{ needs.sanitizer-usan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| QA    | sanitizer-tsan | ${{ needs.sanitizer-tsan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| QA    | sanitizer-msan | ${{ needs.sanitizer-msan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| QA    | coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| QA    | clang-tidy | ${{ needs.clang-tidy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| QA    | cppcheck | ${{ needs.cppcheck.result }} |" >> $GITHUB_STEP_SUMMARY

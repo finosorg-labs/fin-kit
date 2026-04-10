@@ -2,14 +2,16 @@
 
 // Prebuilt mode: link against prebuilt static library.
 // Users need only the Go toolchain.
+// The library path should be provided via CGO_LDFLAGS environment variable, e.g.:
+//
+//	CGO_LDFLAGS="-L/path/to/lib -lfinkit" go build
+//
+// Or set it in the shell before building.
 package fin_kit
 
 /*
-#cgo LDFLAGS: ${SRCDIR}/lib/libfinkit.a \
-    ${SRCDIR}/lib/libfinkit_platform_static.a \
-    ${SRCDIR}/lib/libfinkit_3rdparty_lz4.a \
-    ${SRCDIR}/lib/libfinkit_3rdparty_xxhash.a \
-    ${SRCDIR}/lib/libfinkit_3rdparty_zstd.a \
-    -lm -lpthread
+#cgo LDFLAGS: -L${SRCDIR}/../../build/windows_amd64/lib -lfinkit -lwinpthread
+
+#include "fin_kit.h"
 */
 import "C"

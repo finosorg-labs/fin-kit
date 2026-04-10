@@ -6,8 +6,7 @@
 package fin_kit
 
 /*
-#cgo CFLAGS: -O2 -Wall -std=c11 -I${SRCDIR} -I${SRCDIR}/../../src -I${SRCDIR}/../../third_party
-#cgo LDFLAGS: -lm -lpthread
+#cgo CFLAGS: -O2 -Wall -std=c11 -I${SRCDIR} -I${SRCDIR}/../src -I${SRCDIR}/../third_party
 #include "fin_kit_cgo.c"
 */
 import "C"

@@ -21,9 +21,7 @@ if(CMAKE_TOOLCHAIN_FILE)
     get_filename_component(_tc_name "${CMAKE_TOOLCHAIN_FILE}" NAME)
     if(_tc_name MATCHES "mingw")
         # MinGW cross-compiler on Linux does not define _WIN32, so platform.h
-        # would fall through to the else branch. Override it explicitly.
-        # Use -D to ensure the compiler sees the macro as an integer, not as a
-        # token "FC_OS_WINDOWS=1" which would fail #if FC_OS_WINDOWS checks.
+        # would fall through to the else branch. Override it explicitly via -D.
         add_compile_definitions(-DFC_OS_WINDOWS=1 -DFC_OS_LINUX=0 -DFC_OS_MACOS=0)
     endif()
 endif()
@@ -37,7 +35,25 @@ set(CMAKE_C_FLAGS_COVERAGE "-g -O0 -fprofile-arcs -ftest-coverage")
 set(CMAKE_EXE_LINKER_FLAGS_COVERAGE "--coverage")
 set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "--coverage")
 
-# Output directories
+# Platform name for output directory hierarchy
+# Format: <os>_<arch>  e.g. linux_amd64, windows_amd64, macos_arm64
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(_os_name "windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(_os_name "macos")
+else()
+    set(_os_name "linux")
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm64|aarch64$" OR CMAKE_C_COMPILER_TARGET MATCHES "aarch64")
+    set(_arch_name "arm64")
+else()
+    set(_arch_name "amd64")
+endif()
+
+set(_platform_dir "${_os_name}_${_arch_name}")
+
+# Output directories: all build artifacts live under build/bin and build/lib
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -196,8 +212,14 @@ install(
 # Version header generation
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/fin-kit/version.h
+    ${CMAKE_BINARY_DIR}/include/fin-kit/version.h
     @ONLY
+)
+
+# Install generated version header
+install(
+    FILES ${CMAKE_BINARY_DIR}/include/fin-kit/version.h
+    DESTINATION include/fin-kit
 )
 
 # ---------------------------------------------------------------------------
@@ -254,6 +276,8 @@ message(STATUS " fin-kit ${PROJECT_VERSION}")
 message(STATUS "============================================================")
 message(STATUS "  C Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Platform:   ${_platform_dir}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "  Output:     ${CMAKE_BINARY_DIR}/{bin,lib}/")
 message(STATUS "============================================================")
 message(STATUS "")

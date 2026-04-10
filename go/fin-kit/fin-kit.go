@@ -150,7 +150,8 @@ type SIMDLevel C.fin_kit_simd_level_t
 const (
 	SIMDNone  SIMDLevel = 0
 	SIMDSSE42 SIMDLevel = 1
-	SIMDAVX2  SIMDLevel = 3
+	SIMDAVX2  SIMDLevel = 2
+	SIMDAVX512 SIMDLevel = 3
 )
 
 func (l SIMDLevel) String() string {
