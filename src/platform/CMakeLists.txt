@@ -9,17 +9,20 @@ set(PLATFORM_SOURCES
     error.c
 )
 
-# Platform-specific sources (selected by OS)
-if(WIN32)
+# Platform-specific sources (selected by TARGET OS, not host OS)
+# CMAKE_SYSTEM_NAME is set by the toolchain file and reflects the target platform
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND PLATFORM_SOURCES platform_win.c)
-elseif(APPLE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     list(APPEND PLATFORM_SOURCES platform_macos.c)
-elseif(UNIX AND NOT APPLE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND PLATFORM_SOURCES platform_linux.c)
 endif()
 
 # Create platform object library
 add_library(finkit_platform OBJECT ${PLATFORM_SOURCES})
+
+target_compile_definitions(finkit_platform PRIVATE FC_STATIC_BUILD)
 
 # Set include directories for this library
 target_include_directories(finkit_platform

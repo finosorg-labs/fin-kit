@@ -16,6 +16,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(fin-kit VERSION 1.0.0 LANGUAGES C)
 
+# Cross-compilation support: inject target platform macros based on toolchain file
+if(CMAKE_TOOLCHAIN_FILE)
+    get_filename_component(_tc_name "${CMAKE_TOOLCHAIN_FILE}" NAME)
+    if(_tc_name MATCHES "mingw")
+        # MinGW cross-compiler on Linux does not define _WIN32, so platform.h
+        # would fall through to the else branch. Override it explicitly.
+        add_compile_definitions(FC_OS_WINDOWS=1 FC_OS_LINUX=0 FC_OS_MACOS=0)
+    endif()
+endif()
+
 # C standard: C11
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -162,6 +172,48 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/include/fin-kit/version.h
     @ONLY
 )
+
+# ---------------------------------------------------------------------------
+# Combined library and export set (must come after all add_subdirectory calls)
+# ---------------------------------------------------------------------------
+set(ALL_MODULES finkit_platform)
+set(_deps "")
+foreach(_mod IN LISTS ALL_MODULES)
+    if(TARGET ${_mod})
+        list(APPEND ALL_EXPORTS ${_mod})
+    endif()
+endforeach()
+
+# Create combined library for users who link against the whole library
+if(ALL_EXPORTS)
+    add_library(finkit STATIC $<TARGET_OBJECTS:finkit_platform>)
+    add_library(finkit::finkit ALIAS finkit)
+    target_include_directories(finkit PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_compile_definitions(finkit PRIVATE FC_STATIC_BUILD)
+
+    # Install library and register the export set first (creates "fin-kit-targets")
+    install(TARGETS finkit
+        EXPORT fin-kit-targets
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+    )
+
+    # Then export for build-tree consumers (find_package from build dir)
+    export(EXPORT fin-kit-targets
+        FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
+        NAMESPACE ${PROJECT_NAME}::
+    )
+
+    install(EXPORT fin-kit-targets
+        FILE fin-kitTargets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION lib/cmake/${PROJECT_NAME}
+    )
+endif()
 
 # Install configuration
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/InstallConfig.cmake)

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <sys/sysinfo.h>
 #include <sys/types.h>
@@ -87,7 +88,11 @@ static size_t fc_get_cache_level(int level) {
 }
 
 size_t fc_get_cache_line_size(void) {
+#ifdef _SC_L1D_CACHE_LINESIZE
+    long val = sysconf(_SC_L1D_CACHE_LINESIZE);
+#else
     long val = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+#endif
     if (val > 0) {
         return (size_t)val;
     }

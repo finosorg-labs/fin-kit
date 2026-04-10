@@ -100,25 +100,39 @@
  * Operating system detection
  * ============================================================================ */
 
-#if defined(_WIN32) || defined(_WIN64)
-    #define FC_OS_WINDOWS  1
-    #define FC_OS_LINUX    0
-    #define FC_OS_MACOS    0
+/* FC_OS_* defaults (may be overridden by toolchain -D flags) */
+#ifndef FC_OS_WINDOWS
+    #if defined(_WIN32) || defined(_WIN64)
+        #define FC_OS_WINDOWS  1
+    #else
+        #define FC_OS_WINDOWS  0
+    #endif
+#endif
+
+#ifndef FC_OS_LINUX
+    #if defined(__linux__)
+        #define FC_OS_LINUX   1
+    #else
+        #define FC_OS_LINUX   0
+    #endif
+#endif
+
+#ifndef FC_OS_MACOS
+    #if defined(__APPLE__) && defined(__MACH__)
+        #define FC_OS_MACOS   1
+    #else
+        #define FC_OS_MACOS   0
+    #endif
+#endif
+
+/* Derive FC_OS_STRING from the resolved values */
+#if FC_OS_WINDOWS
     #define FC_OS_STRING   "Windows"
-#elif defined(__linux__)
-    #define FC_OS_WINDOWS  0
-    #define FC_OS_LINUX    1
-    #define FC_OS_MACOS    0
+#elif FC_OS_LINUX
     #define FC_OS_STRING   "Linux"
-#elif defined(__APPLE__) && defined(__MACH__)
-    #define FC_OS_WINDOWS  0
-    #define FC_OS_LINUX    0
-    #define FC_OS_MACOS    1
+#elif FC_OS_MACOS
     #define FC_OS_STRING   "macOS"
 #else
-    #define FC_OS_WINDOWS  0
-    #define FC_OS_LINUX    0
-    #define FC_OS_MACOS    0
     #define FC_OS_STRING   "Unknown"
 #endif
 

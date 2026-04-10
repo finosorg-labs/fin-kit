@@ -30,14 +30,14 @@ fc_simd_level_t g_fc_simd_level = FC_SIMD_SCALAR;
  * @param regs Output register array [eax, ebx, ecx, edx]
  */
 static inline void fc_cpuid(uint32_t eax, uint32_t ecx, uint32_t regs[4]) {
-#if defined(FC_COMPILER_MSVC)
+#if FC_COMPILER_MSVC
     int info[4];
     __cpuidex(info, (int)eax, (int)ecx);
     regs[0] = (uint32_t)info[0];
     regs[1] = (uint32_t)info[1];
     regs[2] = (uint32_t)info[2];
     regs[3] = (uint32_t)info[3];
-#elif defined(FC_COMPILER_GCC) || defined(FC_COMPILER_CLANG)
+#elif FC_COMPILER_GCC || FC_COMPILER_CLANG
     __asm__ volatile (
         "cpuid"
         : "=a"(regs[0]), "=b"(regs[1]), "=c"(regs[2]), "=d"(regs[3])
@@ -95,7 +95,6 @@ static fc_simd_level_t fc_detect_simd_x86(void) {
     uint32_t regs[4] = {0};
     uint32_t max_leaf = 0;
     uint32_t features_ecx = 0;
-    uint32_t features_edx = 0;
     uint32_t extended_features_ebx = 0;
 
     /* Get maximum supported leaf */
@@ -106,7 +105,6 @@ static fc_simd_level_t fc_detect_simd_x86(void) {
     if (max_leaf >= 1) {
         fc_cpuid(1, 0, regs);
         features_ecx = regs[2];
-        features_edx = regs[3];
     }
 
     /* Get extended features for higher levels */

@@ -9,7 +9,7 @@
 #include <string.h>
 #include <math.h>
 
-#if defined(FC_OS_WINDOWS)
+#if FC_OS_WINDOWS
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
 #else
@@ -21,7 +21,7 @@
  * High-resolution timing implementation
  * ============================================================================= */
 
-#if defined(FC_OS_WINDOWS)
+#if FC_OS_WINDOWS
 
 fc_bench_time_t fc_bench_time_now(void) {
     fc_bench_time_t t;
@@ -41,7 +41,7 @@ uint64_t fc_bench_get_timer_resolution_ns(void) {
     return 1000;
 }
 
-#elif defined(FC_OS_MACOS)
+#elif FC_OS_MACOS
 
 #include <mach/mach_time.h>
 
@@ -75,11 +75,11 @@ uint64_t fc_bench_get_timer_resolution_ns(void) {
 
 double fc_bench_time_elapsed(const fc_bench_time_t* start, const fc_bench_time_t* end) {
     uint64_t diff = end->ticks - start->ticks;
-#if defined(FC_OS_WINDOWS)
+#if FC_OS_WINDOWS
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
     return (double)diff / freq.QuadPart;
-#elif defined(FC_OS_MACOS)
+#elif FC_OS_MACOS
     mach_timebase_info_data_t info;
     mach_timebase_info(&info);
     return (double)diff * info.numer / info.denom / 1e9;
@@ -95,11 +95,11 @@ double fc_bench_time_elapsed_ms(const fc_bench_time_t* start, const fc_bench_tim
 }
 
 uint64_t fc_bench_time_elapsed_ns(const fc_bench_time_t* start, const fc_bench_time_t* end) {
-#if defined(FC_OS_WINDOWS)
+#if FC_OS_WINDOWS
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
     return (uint64_t)((end->ticks - start->ticks) * 1e9 / freq.QuadPart);
-#elif defined(FC_OS_MACOS)
+#elif FC_OS_MACOS
     mach_timebase_info_data_t info;
     mach_timebase_info(&info);
     return (end->ticks - start->ticks) * info.numer / info.denom;
@@ -297,7 +297,8 @@ static void fc_bench_warmup(
 
     while (elapsed < warmup_ms) {
         fn(user_data);
-        elapsed = fc_bench_time_elapsed_ms(&start, &fc_bench_time_now());
+        fc_bench_time_t now = fc_bench_time_now();
+        elapsed = fc_bench_time_elapsed_ms(&start, &now);
     }
 }
 

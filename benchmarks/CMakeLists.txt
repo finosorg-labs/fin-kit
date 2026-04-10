@@ -10,6 +10,7 @@ endif()
 # Benchmark executable
 add_executable(finkit_benchmarks
     bench_framework.c
+    bench_main.c
     # Add individual module benchmark files here as they are created
 )
 
@@ -19,6 +20,8 @@ target_link_libraries(finkit_benchmarks
         finkit::platform
         m
 )
+
+target_compile_definitions(finkit_benchmarks PRIVATE FC_STATIC_BUILD)
 
 # Include directories
 target_include_directories(finkit_benchmarks

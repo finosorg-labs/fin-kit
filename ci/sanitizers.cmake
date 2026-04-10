@@ -47,6 +47,7 @@ endif()
 # -----------------------------------------------------------------------------
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug" AND
    NOT CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" AND
+   NOT CMAKE_BUILD_TYPE STREQUAL "Coverage" AND
    NOT CMAKE_BUILD_TYPE STREQUAL "" )
     message(WARNING "Sanitizers are only effective in Debug/RelWithDebInfo builds. "
                     "Current build type: ${CMAKE_BUILD_TYPE}. "

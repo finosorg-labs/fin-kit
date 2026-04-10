@@ -10,6 +10,7 @@ endif()
 # Test executable
 add_executable(finkit_tests
     test_framework.c
+    test_main.c
     # Add individual module test files here as they are created
 )
 
@@ -19,6 +20,8 @@ target_link_libraries(finkit_tests
         finkit::platform
         m
 )
+
+target_compile_definitions(finkit_tests PRIVATE FC_STATIC_BUILD)
 
 # Include directories
 target_include_directories(finkit_tests

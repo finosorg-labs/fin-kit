@@ -10,3 +10,15 @@ _test/tmp
 _vendor*
 gen
 .DS_Store
+
+# CMake build artifacts (platform-specific, do not commit)
+build/
+build-*/
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+compile_commands.json
+build/

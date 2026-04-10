@@ -56,8 +56,7 @@ fc_simd_level_t fc_get_simd_level(void);
  */
 extern fc_simd_level_t g_fc_simd_level;
 
-/* Private: raw detection without global side effect (safe for Go runtime init) */
-extern fc_simd_level_t fc_simd_detect_unsafe(void);
+fc_simd_level_t fc_simd_detect_unsafe(void);
 
 /**
  * @brief Get string description of SIMD level
