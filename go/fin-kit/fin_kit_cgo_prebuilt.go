@@ -10,6 +10,7 @@
 package fin_kit
 
 /*
+#cgo CFLAGS: -I${SRCDIR}/.. -I${SRCDIR}/../../include
 #cgo LDFLAGS: -L${SRCDIR}/../../build/windows_amd64/lib -lfinkit -lwinpthread
 
 #include "fin_kit.h"

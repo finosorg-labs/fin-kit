@@ -307,6 +307,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: cppcheck
+          version: 1.0
+
       - name: Run Cppcheck
         run: |
           cppcheck --enable=all --std=c11 \
@@ -334,15 +340,15 @@ jobs:
 
       - name: Build
         working-directory: go/fin-kit
-        run: go build ./...
+        run: go build -tags fin_kit_cgo ./...
 
       - name: Vet
         working-directory: go/fin-kit
-        run: go vet ./...
+        run: go vet -tags fin_kit_cgo ./...
 
       - name: Test
         working-directory: go/fin-kit
-        run: go test ./...
+        run: go test -tags fin_kit_cgo ./...
 
   # ==========================================================================
   # Build summary

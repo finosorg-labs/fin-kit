@@ -9,7 +9,13 @@
  * Build modes:
  *   - fin_kit_cgo_source: compile C sources directly (dev mode, requires GCC/Clang)
  *   - prebuilt (default): link against prebuilt static library
+ *
+ * This file is only compiled when built with -tags fin_kit_cgo tag.
+ * For prebuilt mode, use fin_kit_prebuilt.c instead.
  */
+
+// This file should only be compiled in source mode
+// In prebuilt mode, fin_kit_prebuilt.c is used instead
 
 #include "fin_kit.h"
 #include "platform/simd_detect.h"
