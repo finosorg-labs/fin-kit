@@ -22,7 +22,9 @@ if(CMAKE_TOOLCHAIN_FILE)
     if(_tc_name MATCHES "mingw")
         # MinGW cross-compiler on Linux does not define _WIN32, so platform.h
         # would fall through to the else branch. Override it explicitly.
-        add_compile_definitions(FC_OS_WINDOWS=1 FC_OS_LINUX=0 FC_OS_MACOS=0)
+        # Use -D to ensure the compiler sees the macro as an integer, not as a
+        # token "FC_OS_WINDOWS=1" which would fail #if FC_OS_WINDOWS checks.
+        add_compile_definitions(-DFC_OS_WINDOWS=1 -DFC_OS_LINUX=0 -DFC_OS_MACOS=0)
     endif()
 endif()
 
@@ -30,17 +32,22 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Coverage build type (GCC/Clang don't natively support "Coverage" as a type)
+set(CMAKE_C_FLAGS_COVERAGE "-g -O0 -fprofile-arcs -ftest-coverage")
+set(CMAKE_EXE_LINKER_FLAGS_COVERAGE "--coverage")
+set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "--coverage")
+
+# Output directories
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 # Compiler flags
 if(MSVC)
     add_compile_options(/W4 /fp:precise /Ob0)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -ffp-contract=off)
 endif()
-
-# Output directories
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Build options
 option(FC_BUILD_TESTS "Build tests" ON)
@@ -54,8 +61,28 @@ if(FC_ENABLE_SANITIZERS)
         if(MSVC)
             add_compile_options(/fsanitize=address)
         else()
-            add_compile_options(-fsanitize=address -fsanitize=undefined -fsanitize=memory)
-            add_link_options(-fsanitize=address -fsanitize=undefined -fsanitize=memory)
+            # FC_SANITIZER_TYPE is set by the CI matrix (address|undefined|thread|memory)
+            # Only enable ONE sanitizer at a time to avoid conflicts.
+            # GCC does not support -fsanitize=memory.
+            # -fsanitize=address and -fsanitize=memory are mutually exclusive.
+            if(FC_SANITIZER_TYPE STREQUAL "address")
+                add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+                add_link_options(-fsanitize=address)
+            elseif(FC_SANITIZER_TYPE STREQUAL "undefined")
+                add_compile_options(-fsanitize=undefined -fno-omit-frame-pointer)
+                add_link_options(-fsanitize=undefined)
+            elseif(FC_SANITIZER_TYPE STREQUAL "thread")
+                add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+                add_link_options(-fsanitize=thread)
+            elseif(FC_SANITIZER_TYPE STREQUAL "memory")
+                # MSan is clang-only (GCC does not support -fsanitize=memory)
+                add_compile_options(-fsanitize=memory -fno-omit-frame-pointer)
+                add_link_options(-fsanitize=memory)
+            else()
+                # Fallback: address only
+                add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+                add_link_options(-fsanitize=address)
+            endif()
         endif()
     endif()
 endif()
