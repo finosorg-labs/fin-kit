@@ -3,6 +3,7 @@
 # =============================================================================
 #
 # All builds run on Linux (ubuntu-24.04) via cross-compilation toolchain.
+# Dependencies are installed per-job via composite action with apt caching.
 #
 # Build matrix:
 #   - Linux native: GCC + Clang, Release
@@ -33,24 +34,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  # ==========================================================================
-  # Common — install all dependencies once, shared by all Linux jobs
-  # ==========================================================================
-
-  setup:
-    name: Setup
-    runs-on: ubuntu-24.04
-    outputs:
-      cached: 'true'
-    steps:
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential gcc g++ clang cmake ninja-build make \
-            mingw-w64 lcov cppcheck clang-tidy
-
   # ==========================================================================
   # Stage 1a — Linux native build (Release, GCC + Clang)
   # ==========================================================================
@@ -58,7 +45,6 @@ jobs:
   linux-build:
     name: Linux / ${{ matrix.compiler }}
     runs-on: ubuntu-24.04
-    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -67,9 +53,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+
       - name: Configure
         env:
           CC: ${{ matrix.compiler }}
+          CMAKE_C_COMPILER_LAUNCHER: ccache
         run: |
           cmake -B build/linux_amd64 \
             -G Ninja \
@@ -83,6 +75,15 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build/linux_amd64
 
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64-${{ matrix.compiler }}
+          path: |
+            build/linux_amd64/lib/
+            build/linux_amd64/bin/
+          retention-days: 5
+
   # ==========================================================================
   # Stage 1b — Windows amd64 cross-compile (Release)
   # ==========================================================================
@@ -90,10 +91,15 @@ jobs:
   windows-cross:
     name: Windows amd64 (cross)
     runs-on: ubuntu-24.04
-    needs: setup
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+          cross-compile: 'true'
 
       - name: Configure
         run: |
@@ -119,17 +125,30 @@ jobs:
           x86_64-w64-mingw32-objdump -f build/windows_amd64/lib/*.a 2>/dev/null \
             | grep "file format" | head -3 || true
 
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64-mingw
+          path: |
+            build/windows_amd64/lib/
+            build/windows_amd64/bin/
+          retention-days: 5
+
   # ==========================================================================
-  # Stage 2a — Sanitizers (ASan / USan / TSan / MSan) — always serial
+  # Stage 2a — Sanitizers (ASan / USan / TSan / MSan)
   # ==========================================================================
 
   sanitizer-asan:
     name: Sanitizer / ASan
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
 
       - name: Configure
         env:
@@ -152,10 +171,14 @@ jobs:
   sanitizer-usan:
     name: Sanitizer / USan
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
 
       - name: Configure
         env:
@@ -178,10 +201,14 @@ jobs:
   sanitizer-tsan:
     name: Sanitizer / TSan
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
 
       - name: Configure
         env:
@@ -204,10 +231,15 @@ jobs:
   sanitizer-msan:
     name: Sanitizer / MSan
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+          qa: 'true'
 
       - name: Configure
         env:
@@ -234,10 +266,15 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+          qa: 'true'
 
       - name: Configure
         run: |
@@ -275,10 +312,15 @@ jobs:
   clang-tidy:
     name: Static / Clang-Tidy
     runs-on: ubuntu-24.04
-    needs: [setup, linux-build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+          qa: 'true'
 
       - name: Configure
         env:
@@ -289,7 +331,8 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DFC_BUILD_TESTS=ON \
-            -DFC_BUILD_BENCHMARKS=OFF
+            -DFC_BUILD_BENCHMARKS=OFF \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Build with clang-tidy
         run: cmake --build build/clang-tidy --parallel --target finkit 2>&1 | tee build.log
@@ -297,21 +340,19 @@ jobs:
       - name: Run clang-tidy
         run: |
           find src -name '*.c' -o -name '*.h' | \
-            xargs clang-tidy --quiet --export-fixes=fixes.yaml 2>&1
+            xargs clang-tidy -p build/clang-tidy --quiet --export-fixes=fixes.yaml 2>&1
 
   cppcheck:
     name: Static / Cppcheck
     runs-on: ubuntu-24.04
-    needs: [setup]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache apt packages
-        uses: awalsh128/cache-apt-pkgs-action@latest
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
         with:
-          packages: cppcheck
-          version: 1.0
+          cppcheck-only: 'true'
 
       - name: Run Cppcheck
         run: |
@@ -332,22 +373,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-deps
+        with:
+          c-build: 'true'
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.1'
-          cache-dependency-path: go/fin-kit/go.sum
+          go-version-file: go/fin-kit/go.mod
 
       - name: Build
         working-directory: go/fin-kit
+        env:
+          CC: gcc
         run: go build -tags fin_kit_cgo ./...
 
       - name: Vet
         working-directory: go/fin-kit
+        env:
+          CC: gcc
         run: go vet -tags fin_kit_cgo ./...
 
       - name: Test
         working-directory: go/fin-kit
+        env:
+          CC: gcc
         run: go test -tags fin_kit_cgo ./...
 
   # ==========================================================================
@@ -356,7 +407,6 @@ jobs:
   build-summary:
     name: Summary
     needs: [
-      setup,
       linux-build, windows-cross,
       sanitizer-asan, sanitizer-usan, sanitizer-tsan, sanitizer-msan,
       coverage, clang-tidy, cppcheck, go-build
