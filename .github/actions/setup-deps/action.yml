@@ -33,7 +33,7 @@ runs:
       if: inputs.cross-compile == 'true'
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: mingw-w64
+        packages: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
         version: 1.0
 
     - name: Install QA tools

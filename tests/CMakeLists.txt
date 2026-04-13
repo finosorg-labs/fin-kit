@@ -38,8 +38,6 @@ else()
 endif()
 
 # Run tests with ctest
-enable_testing()
-
 add_test(
     NAME "finkit_tests"
     COMMAND finkit_tests
