@@ -1,0 +1,59 @@
+name: 'Setup build dependencies'
+description: 'Install and cache apt packages for fin-kit CI'
+
+inputs:
+  c-build:
+    description: 'Install C build tools (gcc, g++, cmake, ninja-build)'
+    required: false
+    default: 'false'
+  cross-compile:
+    description: 'Install MinGW cross-compiler for Windows targets'
+    required: false
+    default: 'false'
+  qa:
+    description: 'Install QA tools (lcov, clang, clang-tidy, cppcheck)'
+    required: false
+    default: 'false'
+  cppcheck-only:
+    description: 'Install only cppcheck (no clang/clang-tidy/lcov)'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install C build tools
+      if: inputs.c-build == 'true'
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: build-essential gcc g++ cmake ninja-build
+        version: 1.0
+
+    - name: Install cross-compile tools
+      if: inputs.cross-compile == 'true'
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: mingw-w64
+        version: 1.0
+
+    - name: Install QA tools
+      if: inputs.qa == 'true'
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: lcov clang clang-tidy cppcheck
+        version: 1.0
+
+    - name: Install cppcheck only
+      if: inputs.cppcheck-only == 'true'
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: cppcheck
+        version: 1.0
+
+    - name: Setup ccache
+      if: inputs.c-build == 'true'
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ runner.os }}
+        max-size: 500M
+        prepend-to-path: true

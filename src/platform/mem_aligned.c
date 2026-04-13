@@ -16,7 +16,7 @@
  * Platform-specific aligned memory allocation
  * ============================================================================ */
 
-#if defined(FC_OS_WINDOWS)
+#if FC_OS_WINDOWS
 
 #include <malloc.h>
 
@@ -44,7 +44,7 @@ void fc_aligned_free(void* ptr) {
     }
 }
 
-#elif defined(FC_OS_LINUX) || defined(FC_OS_MACOS)
+#elif FC_OS_LINUX || FC_OS_MACOS
 
 #include <stdlib.h>
 
