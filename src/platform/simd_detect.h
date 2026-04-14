@@ -24,6 +24,7 @@ typedef enum {
     FC_SIMD_SSE42   = 1,  /**< SSE4.2 supported */
     FC_SIMD_AVX2    = 2,  /**< AVX2 supported */
     FC_SIMD_AVX512  = 3,  /**< AVX-512 supported */
+    FC_SIMD_NEON    = 4,  /**< ARM NEON supported */
 } fc_simd_level_t;
 
 /**

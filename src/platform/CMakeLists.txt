@@ -7,6 +7,7 @@ set(PLATFORM_SOURCES
     simd_detect.c
     mem_aligned.c
     error.c
+    fc_init.c
 )
 
 # Platform-specific sources (selected by TARGET OS, not host OS)

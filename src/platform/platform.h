@@ -503,17 +503,27 @@ FC_API size_t fc_get_l3_cache_size(void);
 FC_END_DECLS
 
 /* ============================================================================
- * Version information
+ * Version information (primary source: cmake/version.h.in, fallback below)
  * ============================================================================ */
 
-#define FC_VERSION_MAJOR  1
-#define FC_VERSION_MINOR  0
-#define FC_VERSION_PATCH  0
+/* Include generated version.h if available */
+#if defined(FC_HAS_VERSION_HEADER)
+#include "version.h"
+#else
 
-#define FC_VERSION_STRING2(x) #x
-#define FC_VERSION_STRING(x) FC_VERSION_STRING2(x)
-#define FC_VERSION  FC_VERSION_STRING(FC_VERSION_MAJOR) "." \
-                   FC_VERSION_STRING(FC_VERSION_MINOR) "." \
-                   FC_VERSION_STRING(FC_VERSION_PATCH)
+#ifndef FC_VERSION_MAJOR
+#define FC_VERSION_MAJOR  1
+#endif
+#ifndef FC_VERSION_MINOR
+#define FC_VERSION_MINOR  0
+#endif
+#ifndef FC_VERSION_PATCH
+#define FC_VERSION_PATCH  0
+#endif
+#ifndef FC_VERSION_STRING
+#define FC_VERSION_STRING "1.0.0"
+#endif
+
+#endif /* FC_HAS_VERSION_HEADER */
 
 #endif /* FC_PLATFORM_H */

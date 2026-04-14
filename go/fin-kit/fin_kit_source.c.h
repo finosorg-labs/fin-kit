@@ -1,35 +1,30 @@
 /**
- * @file fin_kit_cgo.c
- * @brief CGO bindings for fin-kit
+ * @file fin_kit_source.c.h
+ * @brief CGO bindings for fin-kit (source mode)
  *
  * This file wraps the fin-kit C library functions into a stable ABI
- * suitable for cgo consumption. All functions are thin wrappers around
- * the core library; no business logic lives here.
+ * suitable for cgo consumption. In source mode, C sources are compiled
+ * directly alongside this wrapper.
  *
- * Build modes:
- *   - fin_kit_cgo_source: compile C sources directly (dev mode, requires GCC/Clang)
- *   - prebuilt (default): link against prebuilt static library
- *
- * This file is only compiled when built with -tags fin_kit_cgo tag.
- * For prebuilt mode, use fin_kit_prebuilt.c instead.
+ * Build mode: go build -tags fin_kit_cgo
  */
 
-// This file should only be compiled in source mode
-// In prebuilt mode, fin_kit_prebuilt.c is used instead
-
 #include "fin_kit.h"
-#include "platform/simd_detect.h"
-#include "platform/mem_aligned.h"
+#include "../../src/platform/simd_detect.h"
+#include "../../src/platform/mem_aligned.h"
+#include "../../src/platform/error.h"
 
 /* ============================================================================
- * Library init / cleanup
+ * Library init / cleanup — delegates to C core API
  * ============================================================================ */
 
 void fin_kit_lib_init(const fin_kit_config_t* cfg) {
     (void)cfg;
+    fc_init();
 }
 
 void fin_kit_lib_cleanup(void) {
+    fc_cleanup();
 }
 
 /* ============================================================================
@@ -43,6 +38,7 @@ fin_kit_simd_level_t fin_kit_simd_detect(void) {
         case FC_SIMD_SSE42:   return FIN_KIT_SIMD_SSE42;
         case FC_SIMD_AVX2:    return FIN_KIT_SIMD_AVX2;
         case FC_SIMD_AVX512:  return FIN_KIT_SIMD_AVX512;
+        case FC_SIMD_NEON:    return FIN_KIT_SIMD_NEON;
         default:              return FIN_KIT_SIMD_SCALAR;
     }
 }
@@ -52,6 +48,7 @@ int fin_kit_simd_parallelism(fin_kit_simd_level_t level) {
         case FIN_KIT_SIMD_SSE42:   return 2;
         case FIN_KIT_SIMD_AVX2:    return 4;
         case FIN_KIT_SIMD_AVX512:  return 8;
+        case FIN_KIT_SIMD_NEON:    return 2;
         default:                   return 1;
     }
 }
@@ -62,6 +59,7 @@ const char* fin_kit_simd_level_string(fin_kit_simd_level_t level) {
         case FIN_KIT_SIMD_SSE42:   return "SSE4.2";
         case FIN_KIT_SIMD_AVX2:    return "AVX2";
         case FIN_KIT_SIMD_AVX512:  return "AVX-512";
+        case FIN_KIT_SIMD_NEON:    return "NEON";
         default:                    return "Unknown";
     }
 }
@@ -71,12 +69,10 @@ const char* fin_kit_simd_level_string(fin_kit_simd_level_t level) {
  * ============================================================================ */
 
 void* fin_kit_aligned_alloc(size_t size, size_t alignment) {
-    extern void* fc_aligned_alloc(size_t size, size_t alignment);
     return fc_aligned_alloc(size, alignment);
 }
 
 void fin_kit_aligned_free(void* ptr) {
-    extern void fc_aligned_free(void* ptr);
     fc_aligned_free(ptr);
 }
 
@@ -123,7 +119,7 @@ const char* fin_kit_os_name(void) {
 }
 
 const char* fin_kit_arch_name(void) {
-#if defined(__x86_64__) && defined(_M_X64)
+#if defined(__x86_64__) || defined(_M_X64)
     return "x86_64";
 #elif defined(__i386__) || defined(_M_IX86)
     return "x86";
@@ -137,27 +133,33 @@ const char* fin_kit_arch_name(void) {
 }
 
 /* ============================================================================
+ * Version — delegates to C core API
+ * ============================================================================ */
+
+int fin_kit_version(void) {
+    return fc_version();
+}
+
+int fin_kit_version_major(void) {
+    return fc_version_major();
+}
+
+int fin_kit_version_minor(void) {
+    return fc_version_minor();
+}
+
+int fin_kit_version_patch(void) {
+    return fc_version_patch();
+}
+
+const char* fin_kit_version_string(void) {
+    return fc_version_string();
+}
+
+/* ============================================================================
  * Status / error strings
  * ============================================================================ */
 
 const char* fin_kit_status_string(int status) {
-    switch (status) {
-        case FIN_KIT_STATUS_OK:               return "OK";
-        case FIN_KIT_STATUS_ERROR:             return "error";
-        case FIN_KIT_STATUS_INVALID_POINTER:  return "invalid pointer";
-        case FIN_KIT_STATUS_INVALID_SIZE:     return "invalid size";
-        case FIN_KIT_STATUS_NO_MEMORY:        return "out of memory";
-        case FIN_KIT_STATUS_INVALID_ALIGN:    return "invalid alignment";
-        case FIN_KIT_STATUS_NOT_INITIALIZED:  return "not initialized";
-        case FIN_KIT_STATUS_ALREADY_DONE:    return "already done";
-        case FIN_KIT_STATUS_CANCELLATION:     return "cancelled";
-        case FIN_KIT_STATUS_TIMEOUT:           return "timeout";
-        case FIN_KIT_STATUS_OVERFLOW:         return "overflow";
-        case FIN_KIT_STATUS_UNDERFLOW:       return "underflow";
-        case FIN_KIT_STATUS_DIV_BY_ZERO:       return "division by zero";
-        case FIN_KIT_STATUS_INVALID_OPERAND:   return "invalid operand";
-        case FIN_KIT_STATUS_NOT_IMPLEMENTED:  return "not implemented";
-        case FIN_KIT_STATUS_ASSERTION_FAILED:  return "assertion failed";
-        default:                              return "unknown status";
-    }
+    return fc_status_string((fc_status_t)status);
 }

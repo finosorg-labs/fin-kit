@@ -84,7 +84,7 @@ void fc_aligned_free(void* ptr) {
 
 #else
 
-#warning "Unknown platform, using standard malloc (may not satisfy alignment requirements)"
+#warning "Unknown platform, using manual aligned allocation (may not satisfy alignment requirements)"
 
 void* fc_aligned_alloc(size_t size, size_t alignment) {
     if (size == 0) {
@@ -95,17 +95,27 @@ void* fc_aligned_alloc(size_t size, size_t alignment) {
         return NULL;
     }
 
-    /* Allocate extra space to store original pointer for free() */
-    void* raw = malloc(size + alignment);
+    if (alignment < sizeof(void*)) {
+        alignment = sizeof(void*);
+    }
+
+    /* Allocate extra space: alignment for pointer adjustment + sizeof(void*)
+     * to store the original raw pointer just before the aligned address */
+    size_t total = size + alignment + sizeof(void*);
+    if (total < size) {
+        return NULL; /* overflow */
+    }
+
+    void* raw = malloc(total);
     if (raw == NULL) {
         return NULL;
     }
 
-    /* Align pointer upward */
-    uintptr_t addr = (uintptr_t)raw;
+    /* Compute aligned address, leaving room for one void* before it */
+    uintptr_t addr = (uintptr_t)raw + sizeof(void*);
     addr = (addr + alignment - 1) & ~(alignment - 1);
 
-    /* Store original pointer before aligned pointer for recovery in free() */
+    /* Store original pointer immediately before the aligned address */
     void** aligned_ptr = (void**)addr;
     aligned_ptr[-1] = raw;
 
@@ -158,9 +168,16 @@ size_t fc_align_size(size_t size, size_t alignment) {
         return 0;
     }
 
-    /* Round up to nearest power of 2 if not already */
     if ((alignment & (alignment - 1)) != 0) {
-        alignment = (size_t)1 << (64 - __builtin_clzll(alignment));
+        /* Round up to nearest power of 2 */
+        alignment--;
+        alignment |= alignment >> 1;
+        alignment |= alignment >> 2;
+        alignment |= alignment >> 4;
+        alignment |= alignment >> 8;
+        alignment |= alignment >> 16;
+        if (sizeof(alignment) == 8) alignment |= alignment >> 32;
+        alignment++;
     }
 
     return (size + alignment - 1) & ~(alignment - 1);
