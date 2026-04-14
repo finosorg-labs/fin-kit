@@ -73,33 +73,8 @@ option(FC_ENABLE_SANITIZERS "Enable sanitizers (Debug only)" OFF)
 
 # Sanitizer configuration
 if(FC_ENABLE_SANITIZERS)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "")
-        if(MSVC)
-            add_compile_options(/fsanitize=address)
-        else()
-            # FC_SANITIZER_TYPE is set by the CI matrix (address|undefined|thread|memory)
-            # Only enable ONE sanitizer at a time to avoid conflicts.
-            # GCC does not support -fsanitize=memory.
-            # -fsanitize=address and -fsanitize=memory are mutually exclusive.
-            if(FC_SANITIZER_TYPE STREQUAL "address")
-                add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-                add_link_options(-fsanitize=address)
-            elseif(FC_SANITIZER_TYPE STREQUAL "undefined")
-                add_compile_options(-fsanitize=undefined -fno-omit-frame-pointer)
-                add_link_options(-fsanitize=undefined)
-            elseif(FC_SANITIZER_TYPE STREQUAL "thread")
-                add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
-                add_link_options(-fsanitize=thread)
-            elseif(FC_SANITIZER_TYPE STREQUAL "memory")
-                # MSan is clang-only (GCC does not support -fsanitize=memory)
-                add_compile_options(-fsanitize=memory -fno-omit-frame-pointer)
-                add_link_options(-fsanitize=memory)
-            else()
-                # Fallback: address only
-                add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-                add_link_options(-fsanitize=address)
-            endif()
-        endif()
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.github/sanitizers.cmake)
+        include(${CMAKE_CURRENT_SOURCE_DIR}/.github/sanitizers.cmake)
     endif()
 endif()
 

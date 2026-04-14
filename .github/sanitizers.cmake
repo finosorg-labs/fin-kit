@@ -1,5 +1,5 @@
 # =============================================================================
-# ci/sanitizers.cmake - CMake sanitizer configuration for fin-kit
+# .github/sanitizers.cmake - CMake sanitizer configuration for fin-kit
 # =============================================================================
 #
 # Provides unified sanitizer configuration that works across:
