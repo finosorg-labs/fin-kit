@@ -54,11 +54,16 @@ const char* fc_status_string(fc_status_t status);
 /**
  * @brief Check if status code indicates success
  *
+ * Equivalent to (status == FC_OK), provided as a convenience function.
+ * For performance-critical paths, prefer direct comparison: if (status == FC_OK).
+ *
  * @param status Error code
  *
  * @return 1 if success, 0 if failure
  */
-int fc_is_ok(fc_status_t status);
+FC_INLINE int fc_is_ok(fc_status_t status) {
+    return status == FC_OK;
+}
 
 /**
  * @brief Check if this is a fatal error
