@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# fin-kit pre-commit hook
+# Policy:
+# - Run strict checks only when committing on main branch.
+# - Skip on all other branches.
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+if [[ "${CURRENT_BRANCH}" != "main" ]]; then
+  echo "[pre-commit] Branch '${CURRENT_BRANCH}' is not main, skipping checks."
+  exit 0
+fi
+
+echo "[pre-commit] Running strict checks on main branch..."
+
+# Ensure we always execute from repository root
+cd "${ROOT_DIR}"
+
+# Stage 0: basic C build + C tests
+# Reuse existing Makefile targets to stay aligned with project conventions.
+echo "[pre-commit] Stage 0/4: make linux"
+make linux
+
+echo "[pre-commit] Stage 1/4: make test"
+make test
+
+# Stage 2: sanitizer suites (aligned with CI jobs)
+run_sanitizer_suite() {
+  local suite_name="$1"
+  local cc="$2"
+  local build_dir="$3"
+  local sanitizer_type="$4"
+
+  echo "[pre-commit] Stage 2/4: ${suite_name} configure"
+  CC="${cc}" cmake -B "${build_dir}" \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DFC_BUILD_TESTS=ON \
+    -DFC_BUILD_BENCHMARKS=OFF \
+    -DFC_ENABLE_SANITIZERS=ON \
+    -DFC_SANITIZER_TYPE="${sanitizer_type}"
+
+  echo "[pre-commit] Stage 2/4: ${suite_name} build"
+  cmake --build "${build_dir}" --parallel
+
+  echo "[pre-commit] Stage 2/4: ${suite_name} test"
+  ctest --output-on-failure --test-dir "${build_dir}"
+}
+
+run_sanitizer_suite "ASan" "gcc" "build/sanitizer-asan" "address"
+run_sanitizer_suite "USan" "gcc" "build/sanitizer-usan" "undefined"
+run_sanitizer_suite "TSan" "gcc" "build/sanitizer-tsan" "thread"
+run_sanitizer_suite "MSan" "clang" "build/sanitizer-msan" "memory"
+
+# Stage 3: Go checks
+if [[ -d "go/fin-kit" ]]; then
+  echo "[pre-commit] Stage 3/4: go vet"
+  (cd go/fin-kit && CC=gcc go vet -tags fin_kit_cgo ./...)
+
+  echo "[pre-commit] Stage 4/4: go test"
+  (cd go/fin-kit && CC=gcc go test -tags fin_kit_cgo ./...)
+fi
+
+echo "[pre-commit] All strict checks passed."

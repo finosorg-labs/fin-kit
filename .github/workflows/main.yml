@@ -25,9 +25,8 @@ name: fin-kit CI
 
 on:
   push:
-    branches: [main, develop, 'release/**']
-  pull_request:
-    branches: [main, develop]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
