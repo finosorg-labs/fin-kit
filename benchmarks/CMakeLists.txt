@@ -31,12 +31,7 @@ target_include_directories(finkit_benchmarks
 )
 
 # Compiler flags for benchmarks
-if(MSVC)
-    # Disable optimizations for accurate measurements
-    target_compile_options(finkit_benchmarks PRIVATE /W4 /fp:precise /Ob0 /Od)
-else()
-    target_compile_options(finkit_benchmarks PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
-endif()
+target_compile_options(finkit_benchmarks PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
 
 # Create output directory for results
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/benchmarks/results)

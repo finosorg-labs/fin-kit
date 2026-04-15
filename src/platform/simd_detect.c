@@ -27,14 +27,7 @@ fc_simd_level_t g_fc_simd_level = FC_SIMD_SCALAR;
  * @brief Execute CPUID instruction
  */
 static inline void fc_cpuid(uint32_t eax, uint32_t ecx, uint32_t regs[4]) {
-#if FC_COMPILER_MSVC
-    int info[4];
-    __cpuidex(info, (int)eax, (int)ecx);
-    regs[0] = (uint32_t)info[0];
-    regs[1] = (uint32_t)info[1];
-    regs[2] = (uint32_t)info[2];
-    regs[3] = (uint32_t)info[3];
-#elif FC_COMPILER_GCC || FC_COMPILER_CLANG
+#if FC_COMPILER_GCC || FC_COMPILER_CLANG
     __asm__ volatile (
         "cpuid"
         : "=a"(regs[0]), "=b"(regs[1]), "=c"(regs[2]), "=d"(regs[3])
@@ -49,9 +42,7 @@ static inline void fc_cpuid(uint32_t eax, uint32_t ecx, uint32_t regs[4]) {
  * @brief Execute XGETBV instruction
  */
 static inline uint64_t fc_xgetbv(uint32_t ecx) {
-#if FC_COMPILER_MSVC
-    return _xgetbv(ecx);
-#elif FC_COMPILER_GCC || FC_COMPILER_CLANG
+#if FC_COMPILER_GCC || FC_COMPILER_CLANG
     uint32_t eax, edx;
     __asm__ volatile (
         "xgetbv"

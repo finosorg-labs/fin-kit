@@ -23,11 +23,7 @@ target_include_directories(finkit_3rdparty_lz4
 target_link_libraries(finkit_3rdparty_lz4 PRIVATE finkit_3rdparty_xxhash)
 
 # Suppress lz4 compiler warnings
-if(MSVC)
-    target_compile_options(finkit_3rdparty_lz4 PRIVATE /W0)
-else()
-    target_compile_options(finkit_3rdparty_lz4 PRIVATE -w)
-endif()
+target_compile_options(finkit_3rdparty_lz4 PRIVATE -w)
 
 # ---------------------------------------------------------------------------
 # xxHash (BSD-2-Clause) - https://cyan4973.github.io/xxHash/
@@ -40,11 +36,7 @@ target_include_directories(finkit_3rdparty_xxhash
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/xxhash
 )
 
-if(MSVC)
-    target_compile_options(finkit_3rdparty_xxhash PRIVATE /W0)
-else()
-    target_compile_options(finkit_3rdparty_xxhash PRIVATE -w)
-endif()
+target_compile_options(finkit_3rdparty_xxhash PRIVATE -w)
 
 # ---------------------------------------------------------------------------
 # zstd (BSD-3-Clause) - https://facebook.github.io/zstd/
@@ -90,11 +82,7 @@ target_include_directories(finkit_3rdparty_zstd
         ${CMAKE_CURRENT_SOURCE_DIR}/zstd/decompress
 )
 
-if(MSVC)
-    target_compile_options(finkit_3rdparty_zstd PRIVATE /W0)
-else()
-    target_compile_options(finkit_3rdparty_zstd PRIVATE -w)
-endif()
+target_compile_options(finkit_3rdparty_zstd PRIVATE -w)
 
 # ---------------------------------------------------------------------------
 # Combined third-party library for easy linking

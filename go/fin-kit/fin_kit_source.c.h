@@ -85,8 +85,6 @@ const char* fin_kit_compiler_name(void) {
     return "clang";
 #elif defined(__GNUC__)
     return "gcc";
-#elif defined(_MSC_VER)
-    return "msvc";
 #else
     return "unknown";
 #endif
@@ -97,8 +95,6 @@ const char* fin_kit_compiler_version(void) {
     return __clang_version__;
 #elif defined(__GNUC__)
     return __VERSION__;
-#elif defined(_MSC_VER)
-    return "MSVC";
 #else
     return "unknown";
 #endif
@@ -119,13 +115,13 @@ const char* fin_kit_os_name(void) {
 }
 
 const char* fin_kit_arch_name(void) {
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(__x86_64__)
     return "x86_64";
-#elif defined(__i386__) || defined(_M_IX86)
+#elif defined(__i386__)
     return "x86";
-#elif defined(__aarch64__) || defined(_M_ARM64)
+#elif defined(__aarch64__)
     return "aarch64";
-#elif defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm__)
     return "arm";
 #else
     return "unknown";

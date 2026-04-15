@@ -132,7 +132,7 @@ void fin_kit_aligned_free(void* ptr);
 
 /**
  * @brief Get the compiler name.
- * @return "gcc", "clang", "msvc", or "unknown".
+ * @return "gcc", "clang", or "unknown".
  */
 const char* fin_kit_compiler_name(void);
 

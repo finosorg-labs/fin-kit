@@ -34,11 +34,7 @@ target_include_directories(finkit_platform
 )
 
 # Apply common compiler flags
-if(MSVC)
-    target_compile_options(finkit_platform PRIVATE /W4 /fp:precise)
-else()
-    target_compile_options(finkit_platform PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
-endif()
+target_compile_options(finkit_platform PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
 
 # Create static library from platform objects
 add_library(finkit_platform_static STATIC $<TARGET_OBJECTS:finkit_platform>)

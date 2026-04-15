@@ -6,7 +6,7 @@
  * All other headers should include this file for platform-independent base definitions.
  *
  * Main features:
- * - Compiler detection (GCC, Clang, MSVC)
+ * - Compiler detection (GCC, Clang)
  * - Architecture detection (x86, x86_64, ARM, ARM64)
  * - Operating system detection (Windows, Linux, macOS)
  * - Export/import macro definitions
@@ -25,27 +25,13 @@
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_COMPILER_GCC   1
     #define FC_COMPILER_CLANG (__clang__)
-    #define FC_COMPILER_MSVC  0
     #define FC_COMPILER_VERSION_MAJOR __GNUC__
     #define FC_COMPILER_VERSION_MINOR __GNUC_MINOR__
     #define FC_GCC_VERSION     (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
-#elif defined(_MSC_VER)
-    #define FC_COMPILER_GCC   0
-    #define FC_COMPILER_CLANG 0
-    #define FC_COMPILER_MSVC  1
-    #define FC_COMPILER_VERSION_MAJOR (_MSC_VER / 100)
-    #define FC_COMPILER_VERSION_MINOR (_MSC_VER % 100)
-    #define FC_GCC_VERSION     0
-#elif defined(__INTEL_COMPILER)
-    #define FC_COMPILER_GCC   0
-    #define FC_COMPILER_CLANG 0
-    #define FC_COMPILER_MSVC  0
-    #define FC_COMPILER_INTEL 1
 #else
     #warning "Unknown compiler, using defaults"
     #define FC_COMPILER_GCC   0
     #define FC_COMPILER_CLANG 0
-    #define FC_COMPILER_MSVC  0
 #endif
 
 /* C standard version */
@@ -59,28 +45,28 @@
  * Architecture detection
  * ============================================================================ */
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(__x86_64__)
     #define FC_ARCH_X86_64   1
     #define FC_ARCH_X86      0
     #define FC_ARCH_ARM64    0
     #define FC_ARCH_ARM      0
     #define FC_ARCH_GENERIC  0
     #define FC_ARCH_STRING   "x86_64"
-#elif defined(__i386__) || defined(_M_IX86)
+#elif defined(__i386__)
     #define FC_ARCH_X86_64   0
     #define FC_ARCH_X86      1
     #define FC_ARCH_ARM64    0
     #define FC_ARCH_ARM      0
     #define FC_ARCH_GENERIC  0
     #define FC_ARCH_STRING   "x86"
-#elif defined(__aarch64__) || defined(_M_ARM64)
+#elif defined(__aarch64__)
     #define FC_ARCH_X86_64   0
     #define FC_ARCH_X86      0
     #define FC_ARCH_ARM64    1
     #define FC_ARCH_ARM      0
     #define FC_ARCH_GENERIC  0
     #define FC_ARCH_STRING   "arm64"
-#elif defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm__)
     #define FC_ARCH_X86_64   0
     #define FC_ARCH_X86      0
     #define FC_ARCH_ARM64    0
@@ -102,7 +88,7 @@
 
 /* FC_OS_* defaults (may be overridden by toolchain -D flags) */
 #ifndef FC_OS_WINDOWS
-    #if defined(_WIN32) || defined(_WIN64)
+    #if defined(_WIN32)
         #define FC_OS_WINDOWS  1
     #else
         #define FC_OS_WINDOWS  0
@@ -141,35 +127,35 @@
  * ============================================================================ */
 
 /* SSE4.2 */
-#if defined(__SSE4_2__) || (FC_COMPILER_MSVC && defined(_M_X64))
+#if defined(__SSE4_2__)
     #define FC_HAS_SSE42 1
 #else
     #define FC_HAS_SSE42 0
 #endif
 
 /* AVX */
-#if defined(__AVX__) || (FC_COMPILER_MSVC && defined(_M_X64))
+#if defined(__AVX__)
     #define FC_HAS_AVX 1
 #else
     #define FC_HAS_AVX 0
 #endif
 
 /* AVX2 */
-#if defined(__AVX2__) || (FC_COMPILER_MSVC && defined(_M_X64))
+#if defined(__AVX2__)
     #define FC_HAS_AVX2 1
 #else
     #define FC_HAS_AVX2 0
 #endif
 
 /* AVX-512 */
-#if defined(__AVX512F__) || (FC_COMPILER_MSVC && defined(_M_X64))
+#if defined(__AVX512F__)
     #define FC_HAS_AVX512 1
 #else
     #define FC_HAS_AVX512 0
 #endif
 
 /* FMA support */
-#if defined(__FMA__) || (FC_COMPILER_MSVC && defined(_M_X64))
+#if defined(__FMA__)
     #define FC_HAS_FMA 1
 #else
     #define FC_HAS_FMA 0
@@ -192,9 +178,9 @@
 #else
     #if defined(_WIN32)
         #ifdef FC_EXPORTS
-            #define FC_API __declspec(dllexport)
+            #define FC_API __attribute__((dllexport))
         #else
-            #define FC_API __declspec(dllimport)
+            #define FC_API __attribute__((dllimport))
         #endif
         #define FC_INTERNAL
     #else
@@ -346,8 +332,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 /* Inline hints */
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_INLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-    #define FC_INLINE __forceinline
 #else
     #define FC_INLINE inline
 #endif
@@ -358,8 +342,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 /* Function noreturn annotation */
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_NORETURN __attribute__((noreturn))
-#elif defined(_MSC_VER)
-    #define FC_NORETURN __declspec(noreturn)
 #else
     #define FC_NORETURN
 #endif
@@ -374,8 +356,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 /* Struct alignment */
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_ALIGNED(n) __attribute__((aligned(n)))
-#elif defined(_MSC_VER)
-    #define FC_ALIGNED(n) __declspec(align(n))
 #else
     #define FC_ALIGNED(n)
 #endif
@@ -383,8 +363,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 /* Packed struct (no padding) */
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_PACKED __attribute__((packed))
-#elif defined(_MSC_VER)
-    #define FC_PACKED
 #else
     #define FC_PACKED
 #endif
@@ -395,9 +373,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
-#elif defined(_MSC_VER)
-    #include <intrin.h>
-    #define FC_MEMORY_BARRIER() _ReadWriteBarrier()
 #else
     #define FC_MEMORY_BARRIER()
 #endif
@@ -411,10 +386,6 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_ATOMIC_LOAD(ptr) __atomic_load_n((ptr), __ATOMIC_ACQUIRE)
     #define FC_ATOMIC_STORE(ptr, val) __atomic_store_n((ptr), (val), __ATOMIC_RELEASE)
-#elif defined(_MSC_VER)
-    #include <intrin.h>
-    #define FC_ATOMIC_LOAD(ptr) (*(ptr))
-    #define FC_ATOMIC_STORE(ptr, val) ((*(ptr)) = (val))
 #else
     #define FC_ATOMIC_LOAD(ptr) (*(ptr))
     #define FC_ATOMIC_STORE(ptr, val) ((*(ptr)) = (val))

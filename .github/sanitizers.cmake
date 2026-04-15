@@ -3,8 +3,7 @@
 # =============================================================================
 #
 # Provides unified sanitizer configuration that works across:
-#   - GCC / Clang (Linux, macOS)
-#   - MSVC (Windows)
+#   - GCC / Clang (Linux, macOS, Windows via MinGW)
 #
 # Usage:
 #   cmake -B build -DFC_ENABLE_SANITIZERS=ON -DFC_SANITIZER_TYPE=address
@@ -58,22 +57,15 @@ endif()
 # -----------------------------------------------------------------------------
 # Compiler detection
 # -----------------------------------------------------------------------------
-if(MSVC)
-    set(_COMPILER_IS_MSVC TRUE)
-    set(_COMPILER_IS_GNUC FALSE)
-    set(_COMPILER_IS_CLANG FALSE)
-elseif(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_C_COMPILER_ID MATCHES "Arm")
-    set(_COMPILER_IS_MSVC FALSE)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_C_COMPILER_ID MATCHES "Arm")
     set(_COMPILER_IS_GNUC TRUE)
     set(_COMPILER_IS_CLANG FALSE)
 elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    set(_COMPILER_IS_MSVC FALSE)
     set(_COMPILER_IS_GNUC FALSE)
     set(_COMPILER_IS_CLANG TRUE)
 else()
     message(AUTHOR_WARNING "Unknown compiler '${CMAKE_C_COMPILER_ID}'. "
                            "Sanitizer support may be incomplete.")
-    set(_COMPILER_IS_MSVC FALSE)
     set(_COMPILER_IS_GNUC TRUE)
     set(_COMPILER_IS_CLANG FALSE)
 endif()
@@ -186,44 +178,6 @@ if(_COMPILER_IS_GNUC OR _COMPILER_IS_CLANG)
 endif()
 
 # -----------------------------------------------------------------------------
-# MSVC sanitizer configuration
-# -----------------------------------------------------------------------------
-if(_COMPILER_IS_MSVC)
-
-    # MSVC supports AddressSanitizer starting from VS2019 16.9
-    # It is embedded in the CRT via /fsanitize=address
-    # /RTCc is no longer needed with ASan
-
-    set(_MSVC_ASAN_FLAG "/fsanitize=address")
-
-    if(FC_SANITIZER_TYPE STREQUAL "address" OR FC_SANITIZER_TYPE STREQUAL "all")
-
-        # Check MSVC version for ASan support
-        if(MSVC_VERSION LESS 1929)
-            message(FATAL_ERROR "fin-kit: MSVC AddressSanitizer requires Visual Studio 2019 "
-                               "version 16.9 or later (MSVC version >= 1929). "
-                               "Current version: ${MSVC_VERSION}")
-        endif()
-
-        add_compile_options(${_MSVC_ASAN_FLAG})
-
-        # Force debug runtime for ASan to get better stack traces
-        add_compile_options(/MDd)
-
-        message(STATUS "fin-kit sanitizers: enabled AddressSanitizer "
-                       "(${_MSVC_ASAN_FLAG}) for ${CMAKE_BUILD_TYPE} build")
-        message(STATUS "fin-kit sanitizers: Note - MSVC does not support USan/TSan/MSan. "
-                       "Use Clang or GCC on Windows for full sanitizer support (via MinGW).")
-
-    elseif(NOT FC_SANITIZER_TYPE STREQUAL "all")
-        message(STATUS "fin-kit sanitizers: MSVC only supports 'address' sanitizer. "
-                       "Requested: '${FC_SANITIZER_TYPE}'. No flags applied. "
-                       "Use Clang/GCC (MinGW) on Windows for other sanitizers.")
-    endif()
-
-endif()
-
-# -----------------------------------------------------------------------------
 # Sanitizer-specific environment / runtime options
 # -----------------------------------------------------------------------------
 
@@ -292,19 +246,9 @@ if(_COMPILER_IS_GNUC OR _COMPILER_IS_CLANG)
     message(STATUS "fin-kit sanitizers: runtime options written to ${CMAKE_BINARY_DIR}/sanitizer_env.sh")
 endif()
 
-# Write .bat file for Windows (MSVC ASan)
-if(_COMPILER_IS_MSVC AND FC_SANITIZER_TYPE STREQUAL "address")
-    file(WRITE "${CMAKE_BINARY_DIR}/sanitizer_env.bat" "@echo off\n")
-    string(REPLACE ";" " " _asan_opts_win "${ASAN_OPTIONS}")
-    file(APPEND "${CMAKE_BINARY_DIR}/sanitizer_env.bat"
-        "set ASAN_OPTIONS=${_asan_opts_win}\n")
-    message(STATUS "fin-kit sanitizers: runtime options written to ${CMAKE_BINARY_DIR}/sanitizer_env.bat")
-endif()
-
 # -----------------------------------------------------------------------------
 # Cleanup helper variables
 # -----------------------------------------------------------------------------
-unset(_COMPILER_IS_MSVC)
 unset(_COMPILER_IS_GNUC)
 unset(_COMPILER_IS_CLANG)
 unset(_valid_types)

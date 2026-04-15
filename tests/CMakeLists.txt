@@ -31,11 +31,7 @@ target_include_directories(finkit_tests
 )
 
 # Compiler flags for tests
-if(MSVC)
-    target_compile_options(finkit_tests PRIVATE /W4 /fp:precise)
-else()
-    target_compile_options(finkit_tests PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+target_compile_options(finkit_tests PRIVATE -Wall -Wextra -Wpedantic)
 
 # Run tests with ctest
 add_test(
