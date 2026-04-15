@@ -12,5 +12,7 @@ package fin_kit
 #include "../../src/platform/simd_detect.c"
 #include "../../src/platform/mem_aligned.c"
 #include "../../src/platform/error.c"
+#include "../../src/platform/fc_init.c"
+#include "../../src/platform/platform_linux.c"
 */
 import "C"

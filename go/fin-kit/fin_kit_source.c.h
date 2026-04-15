@@ -1,25 +1,27 @@
 /**
  * @file fin_kit_source.c.h
- * @brief CGO bindings for fin-kit (source mode)
+ * @brief C source wrapper for Go cgo source mode
  *
- * This file wraps the fin-kit C library functions into a stable ABI
- * suitable for cgo consumption. In source mode, C sources are compiled
- * directly alongside this wrapper.
- *
- * Build mode: go build -tags fin_kit_cgo
+ * This file implements the stable C ABI defined in fin_kit.h by wrapping
+ * the internal platform layer functions. It is included directly by
+ * fin_kit_cgo_source.go when building with -tags fin_kit_cgo.
  */
 
+#ifndef FIN_KIT_SOURCE_C_H
+#define FIN_KIT_SOURCE_C_H
+
 #include "fin_kit.h"
+#include "../../src/platform/platform.h"
 #include "../../src/platform/simd_detect.h"
 #include "../../src/platform/mem_aligned.h"
 #include "../../src/platform/error.h"
 
 /* ============================================================================
- * Library init / cleanup — delegates to C core API
+ * Library initialization
  * ============================================================================ */
 
 void fin_kit_lib_init(const fin_kit_config_t* cfg) {
-    (void)cfg;
+    (void)cfg; /* Configuration not yet used in Stage 0 */
     fc_init();
 }
 
@@ -33,35 +35,15 @@ void fin_kit_lib_cleanup(void) {
 
 fin_kit_simd_level_t fin_kit_simd_detect(void) {
     fc_simd_level_t level = fc_detect_simd();
-    switch (level) {
-        case FC_SIMD_SCALAR:  return FIN_KIT_SIMD_SCALAR;
-        case FC_SIMD_SSE42:   return FIN_KIT_SIMD_SSE42;
-        case FC_SIMD_AVX2:    return FIN_KIT_SIMD_AVX2;
-        case FC_SIMD_AVX512:  return FIN_KIT_SIMD_AVX512;
-        case FC_SIMD_NEON:    return FIN_KIT_SIMD_NEON;
-        default:              return FIN_KIT_SIMD_SCALAR;
-    }
-}
-
-int fin_kit_simd_parallelism(fin_kit_simd_level_t level) {
-    switch (level) {
-        case FIN_KIT_SIMD_SSE42:   return 2;
-        case FIN_KIT_SIMD_AVX2:    return 4;
-        case FIN_KIT_SIMD_AVX512:  return 8;
-        case FIN_KIT_SIMD_NEON:    return 2;
-        default:                   return 1;
-    }
+    return (fin_kit_simd_level_t)level;
 }
 
 const char* fin_kit_simd_level_string(fin_kit_simd_level_t level) {
-    switch (level) {
-        case FIN_KIT_SIMD_SCALAR:  return "Scalar";
-        case FIN_KIT_SIMD_SSE42:   return "SSE4.2";
-        case FIN_KIT_SIMD_AVX2:    return "AVX2";
-        case FIN_KIT_SIMD_AVX512:  return "AVX-512";
-        case FIN_KIT_SIMD_NEON:    return "NEON";
-        default:                    return "Unknown";
-    }
+    return fc_simd_level_string((fc_simd_level_t)level);
+}
+
+int fin_kit_simd_parallelism(fin_kit_simd_level_t level) {
+    return (int)fc_simd_parallelism((fc_simd_level_t)level);
 }
 
 /* ============================================================================
@@ -81,9 +63,9 @@ void fin_kit_aligned_free(void* ptr) {
  * ============================================================================ */
 
 const char* fin_kit_compiler_name(void) {
-#if defined(__clang__)
+#if FC_COMPILER_CLANG
     return "clang";
-#elif defined(__GNUC__)
+#elif FC_COMPILER_GCC
     return "gcc";
 #else
     return "unknown";
@@ -91,9 +73,7 @@ const char* fin_kit_compiler_name(void) {
 }
 
 const char* fin_kit_compiler_version(void) {
-#if defined(__clang__)
-    return __clang_version__;
-#elif defined(__GNUC__)
+#if FC_COMPILER_GCC || FC_COMPILER_CLANG
     return __VERSION__;
 #else
     return "unknown";
@@ -101,61 +81,19 @@ const char* fin_kit_compiler_version(void) {
 }
 
 const char* fin_kit_os_name(void) {
-#if defined(_WIN32)
-    return "windows";
-#elif defined(__linux__)
-    return "linux";
-#elif defined(__APPLE__)
-    return "darwin";
-#elif defined(__FreeBSD__)
-    return "freebsd";
-#else
-    return "unknown";
-#endif
+    return FC_OS_STRING;
 }
 
 const char* fin_kit_arch_name(void) {
-#if defined(__x86_64__)
-    return "x86_64";
-#elif defined(__i386__)
-    return "x86";
-#elif defined(__aarch64__)
-    return "aarch64";
-#elif defined(__arm__)
-    return "arm";
-#else
-    return "unknown";
-#endif
+    return FC_ARCH_STRING;
 }
 
 /* ============================================================================
- * Version — delegates to C core API
- * ============================================================================ */
-
-int fin_kit_version(void) {
-    return fc_version();
-}
-
-int fin_kit_version_major(void) {
-    return fc_version_major();
-}
-
-int fin_kit_version_minor(void) {
-    return fc_version_minor();
-}
-
-int fin_kit_version_patch(void) {
-    return fc_version_patch();
-}
-
-const char* fin_kit_version_string(void) {
-    return fc_version_string();
-}
-
-/* ============================================================================
- * Status / error strings
+ * Status / error utilities
  * ============================================================================ */
 
 const char* fin_kit_status_string(int status) {
     return fc_status_string((fc_status_t)status);
 }
+
+#endif /* FIN_KIT_SOURCE_C_H */

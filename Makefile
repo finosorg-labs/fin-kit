@@ -5,7 +5,7 @@
 #   make linux     build Linux native
 #   make windows   cross-compile Windows amd64
 #   make all       build Linux + Windows
-#   make test      run tests (Linux only)
+#   make test      run tests (C + Go)
 #   make clean     remove all build artifacts
 #   make help      show this message
 #
@@ -67,9 +67,12 @@ go:
 	@echo "==> Building Go module (verify compilation)"
 	cd go/fin-kit && go build -tags fin_kit_cgo ./...
 
-test:
-	@echo "==> Running tests on Linux"
+test: linux
+	@echo "==> Running C tests on Linux"
 	cd $(LINUX_BUILD_DIR) && ctest --output-on-failure
+	@echo ""
+	@echo "==> Running Go tests"
+	cd go/fin-kit && go test -tags fin_kit_cgo -v
 
 verify:
 	@echo "=== Verify artifact formats ===" && \
@@ -88,7 +91,7 @@ help:
 	echo "  make linux    build Linux native" && \
 	echo "  make windows  cross-compile Windows amd64" && \
 	echo "  make all      build Linux + Windows" && \
-	echo "  make test     run tests (Linux only)" && \
+	echo "  make test     run tests (C + Go)" && \
 	echo "  make verify   verify artifact formats" && \
 	echo "  make clean    remove build artifacts" && \
 	echo "" && \
