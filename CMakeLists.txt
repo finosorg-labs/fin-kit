@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # fin-kit High-Performance Financial Computing Library
-# =============================================================================
+#
 # Build:
 #   cmake -B build && cmake --build build
 #
@@ -11,7 +11,7 @@
 #
 # Install:
 #   cmake --install build --prefix /usr/local
-# =============================================================================
+#
 
 cmake_minimum_required(VERSION 3.16)
 project(fin-kit VERSION 1.0.0 LANGUAGES C)
@@ -205,16 +205,24 @@ foreach(_mod IN LISTS ALL_MODULES)
     endif()
 endforeach()
 
+# Collect all object libraries
+set(ALL_OBJECTS $<TARGET_OBJECTS:finkit_platform>)
+if(TARGET matrix_obj)
+    list(APPEND ALL_OBJECTS $<TARGET_OBJECTS:matrix_obj>)
+endif()
+
 # Create combined library for users who link against the whole library
 if(ALL_EXPORTS)
-    add_library(finkit STATIC $<TARGET_OBJECTS:finkit_platform>)
+    add_library(finkit STATIC ${ALL_OBJECTS})
     add_library(finkit::finkit ALIAS finkit)
     target_include_directories(finkit PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
     target_compile_definitions(finkit PRIVATE FC_STATIC_BUILD)
+    target_link_libraries(finkit PUBLIC m)
 
     # Install library and register the export set first (creates "fin-kit-targets")
     install(TARGETS finkit

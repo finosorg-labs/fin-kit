@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # .github/sanitizers.cmake - CMake sanitizer configuration for fin-kit
-# =============================================================================
+#
 #
 # Provides unified sanitizer configuration that works across:
 #   - GCC / Clang (Linux, macOS, Windows via MinGW)
@@ -19,7 +19,7 @@
 # NOTE: Sanitizers are only effective in Debug or RelWithDebInfo builds.
 #       They impose significant runtime overhead and are NOT suitable for
 #       production Release builds.
-# =============================================================================
+#
 
 include_guard(GLOBAL)
 

@@ -12,9 +12,9 @@
 #include <string.h>
 #include <stdint.h>
 
-/* ============================================================================
+/*
  * Platform-specific aligned memory allocation
- * ============================================================================ */
+*/
 
 #if FC_OS_WINDOWS
 
@@ -131,9 +131,9 @@ void fc_aligned_free(void* ptr) {
 
 #endif /* FC_OS_* */
 
-/* ============================================================================
+/*
  * Memory alignment utility functions
- * ============================================================================ */
+*/
 
 int fc_is_aligned(const void* ptr, size_t alignment) {
     if (ptr == NULL) {
@@ -194,9 +194,9 @@ void* fc_align_ptr(const void* ptr, size_t alignment) {
     return (void*)addr;
 }
 
-/* ============================================================================
+/*
  * Typed allocation convenience functions
- * ============================================================================ */
+*/
 
 void* fc_aligned_alloc_double(size_t n) {
     return fc_aligned_alloc(n * sizeof(double), fc_get_default_alignment());

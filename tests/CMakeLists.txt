@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # tests/CMakeLists.txt - Test configuration
-# =============================================================================
+#
 
 if(NOT FC_BUILD_TESTS)
     message(STATUS "Tests: disabled (FC_BUILD_TESTS=OFF)")
@@ -11,13 +11,14 @@ endif()
 add_executable(finkit_tests
     test_framework.c
     test_main.c
+    test_matrix.c
     # Add individual module test files here as they are created
 )
 
-# Link with platform library and math library
+# Link with finkit library (includes all modules)
 target_link_libraries(finkit_tests
     PRIVATE
-        finkit::platform
+        finkit
         m
 )
 

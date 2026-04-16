@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # src/platform/CMakeLists.txt - Platform abstraction layer
-# =============================================================================
+#
 
 # Platform abstraction layer sources
 set(PLATFORM_SOURCES

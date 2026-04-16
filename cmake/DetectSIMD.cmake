@@ -1,9 +1,9 @@
-# =============================================================================
+#
 # DetectSIMD.cmake - CPU SIMD capability detection
-# =============================================================================
+#
 # Populates FC_SIMD_LEVEL with: SCALAR, SSE42, AVX2, or AVX512
 # Then creates an interface library that links compiler flags from CompilerFlags.cmake
-# =============================================================================
+#
 
 include(CheckCSourceCompiles)
 

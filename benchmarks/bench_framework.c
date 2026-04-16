@@ -17,9 +17,9 @@
     #include <time.h>
 #endif
 
-/* =============================================================================
+/*
  * High-resolution timing implementation
- * ============================================================================= */
+*/
 
 #if FC_OS_WINDOWS
 
@@ -108,9 +108,9 @@ uint64_t fc_bench_time_elapsed_ns(const fc_bench_time_t* start, const fc_bench_t
 #endif
 }
 
-/* =============================================================================
+/*
  * Benchmark result functions
- * ============================================================================= */
+*/
 
 void fc_bench_result_print(const fc_bench_result_t* result) {
     printf("\n============================================================\n");
@@ -176,9 +176,9 @@ double fc_bench_result_compare(const fc_bench_result_t* a, const fc_bench_result
     return b->mean_ns - a->mean_ns;
 }
 
-/* =============================================================================
+/*
  * Throughput and performance calculations
- * ============================================================================= */
+*/
 
 double fc_bench_throughput_gb_s(size_t bytes, double elapsed_ms) {
     if (elapsed_ms <= 0) return 0;
@@ -195,9 +195,9 @@ double fc_bench_ops_per_sec(uint64_t ops, double elapsed_ms) {
     return ops / (elapsed_ms / 1000.0);
 }
 
-/* =============================================================================
+/*
  * Statistical functions (Welford's online algorithm)
- * ============================================================================= */
+*/
 
 void fc_bench_stats_init(fc_bench_stats_t* stats) {
     stats->count = 0;
@@ -247,9 +247,9 @@ void fc_bench_stats_print(const fc_bench_stats_t* stats, const char* name) {
            (unsigned long)stats->count);
 }
 
-/* =============================================================================
+/*
  * Memory bandwidth estimation
- * ============================================================================= */
+*/
 
 double fc_bench_mem_bandwidth_gb_s(
     size_t bytes_read,
@@ -260,9 +260,9 @@ double fc_bench_mem_bandwidth_gb_s(
     return fc_bench_throughput_gb_s(total_bytes, elapsed_ms);
 }
 
-/* =============================================================================
+/*
  * Benchmark runner
- * ============================================================================= */
+*/
 
 static int g_verbose = 1;
 static FILE* g_output_file = NULL;

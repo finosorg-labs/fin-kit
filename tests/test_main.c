@@ -4,16 +4,27 @@
  */
 
 #include "test_framework.h"
+#include <fin-kit/fin-kit.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+/* External test registration functions */
+extern void register_matrix_tests(void);
 
-    fc_test_init();
+int main(int argc, char** argv) {
+    /* Initialize fin-kit library */
+    fc_init();
+
+    /* Initialize test framework with command line arguments */
+    fc_test_init_with_args(argc, argv);
+
+    /* Register all test suites */
+    register_matrix_tests();
 
     int result = fc_test_run_all();
+
+    /* Generate coverage report if requested */
+    fc_test_generate_coverage_report();
 
     fc_test_cleanup();
 

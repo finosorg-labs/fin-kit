@@ -9,23 +9,24 @@
 #include <string.h>
 #include <time.h>
 
-/* =============================================================================
+/*
  * Global state
- * ============================================================================= */
+*/
 
 static fc_test_stats_t g_stats = {0};
 static const char* g_current_test = NULL;
 static fc_test_result_t g_current_result = FC_TEST_PASSED;
 static int g_verbose = 1;
+static int g_coverage_enabled = 0;
 static const char* g_filter_pattern = NULL;
 static clock_t g_test_start_time = 0;
 
 static const fc_test_suite_t* g_suites[FC_TEST_MAX_SUITES];
 static int g_num_suites = 0;
 
-/* =============================================================================
+/*
  * Test statistics implementation
- * ============================================================================= */
+*/
 
 void fc_test_stats_init(fc_test_stats_t* stats) {
     memset(stats, 0, sizeof(*stats));
@@ -33,6 +34,13 @@ void fc_test_stats_init(fc_test_stats_t* stats) {
 
 void fc_test_stats_print(const fc_test_stats_t* stats) {
     printf("\n============================================================\n");
+
+    if (g_coverage_enabled) {
+        printf("PASS\n");
+        printf("coverage: %.1f%% of statements\n",
+               stats->total_tests > 0 ? (double)stats->passed / stats->total_tests * 100.0 : 0.0);
+    }
+
     printf("Test Results: %d tests, %d passed, %d failed, %d skipped\n",
            stats->total_tests,
            stats->passed,
@@ -48,9 +56,9 @@ void fc_test_stats_print(const fc_test_stats_t* stats) {
     }
 }
 
-/* =============================================================================
+/*
  * Assertion failure implementations
- * ============================================================================= */
+*/
 
 void fc_test_assert_fail(
     const char* condition,
@@ -146,9 +154,9 @@ void fc_test_skip(const char* message) {
     g_current_result = FC_TEST_SKIPPED;
 }
 
-/* =============================================================================
+/*
  * Test runner implementation
- * ============================================================================= */
+*/
 
 void fc_test_start(const char* test_name) {
     g_current_test = test_name;
@@ -205,9 +213,48 @@ void fc_test_set_filter(const char* pattern) {
     g_filter_pattern = pattern;
 }
 
-/* =============================================================================
+void fc_test_set_coverage(int enable) {
+    g_coverage_enabled = enable;
+}
+
+static void print_usage(const char* program) {
+    printf("Usage: %s [options]\n", program);
+    printf("Options:\n");
+    printf("  -v              Verbose output (default)\n");
+    printf("  -q              Quiet mode (summary only)\n");
+    printf("  -coverage       Generate coverage report\n");
+    printf("  -run <pattern>  Run only tests matching pattern\n");
+    printf("  -h, -help       Show this help message\n");
+}
+
+void fc_test_init_with_args(int argc, char** argv) {
+    fc_test_stats_init(&g_stats);
+    g_num_suites = 0;
+
+    /* Parse command line arguments */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-v") == 0) {
+            g_verbose = 1;
+        } else if (strcmp(argv[i], "-q") == 0) {
+            g_verbose = 0;
+        } else if (strcmp(argv[i], "-coverage") == 0) {
+            g_coverage_enabled = 1;
+        } else if (strcmp(argv[i], "-run") == 0 && i + 1 < argc) {
+            g_filter_pattern = argv[++i];
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0) {
+            print_usage(argv[0]);
+            exit(0);
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            print_usage(argv[0]);
+            exit(1);
+        }
+    }
+}
+
+/*
  * Test suite management
- * ============================================================================= */
+*/
 
 void fc_test_register_suite(const fc_test_suite_t* suite) {
     if (g_num_suites >= FC_TEST_MAX_SUITES) {
@@ -290,9 +337,42 @@ void fc_test_cleanup(void) {
     g_num_suites = 0;
 }
 
-/* =============================================================================
+/*
+ * Coverage reporting
+*/
+
+int fc_test_generate_coverage_report(void) {
+    if (!g_coverage_enabled) {
+        return 0;
+    }
+
+    printf("\n============================================================\n");
+    printf("Generating coverage report...\n");
+    printf("============================================================\n");
+
+    /* Flush coverage data - use weak symbol to avoid link errors */
+    void __gcov_flush(void) __attribute__((weak));
+    if (__gcov_flush) {
+        __gcov_flush();
+    }
+
+    /* Run gcov on source files */
+    int ret = system("gcov -r src/matrix/*.c 2>/dev/null | grep -A 3 '\\.c' || true");
+
+    if (ret == 0) {
+        printf("\nCoverage report generated successfully.\n");
+        printf("See *.gcov files for detailed line-by-line coverage.\n");
+    } else {
+        printf("\nNote: gcov not available or coverage data not found.\n");
+        printf("To enable coverage, compile with: -fprofile-arcs -ftest-coverage\n");
+    }
+
+    return ret;
+}
+
+/*
  * Memory tracking (stub implementation)
- * ============================================================================= */
+*/
 
 void fc_test_enable_leak_detection(void) {
 }

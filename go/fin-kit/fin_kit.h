@@ -16,18 +16,18 @@
 extern "C" {
 #endif
 
-/* ============================================================================
+/*
  * API version
- * ============================================================================ */
+*/
 
 #define FIN_KIT_VERSION_MAJOR 1
 #define FIN_KIT_VERSION_MINOR 0
 #define FIN_KIT_VERSION_PATCH 0
 
-/* ============================================================================
+/*
  * SIMD level enumeration (stable ABI)
  * Must match Go fin_kit.SIMDLevel values.
- * ============================================================================ */
+*/
 
 typedef enum {
     FIN_KIT_SIMD_SCALAR = 0,
@@ -37,10 +37,10 @@ typedef enum {
     FIN_KIT_SIMD_NEON   = 4,
 } fin_kit_simd_level_t;
 
-/* ============================================================================
+/*
  * Status / error codes
  * Must match fc_status_t in the C core API.
- * ============================================================================ */
+*/
 
 typedef enum {
     FIN_KIT_STATUS_OK                = 0,
@@ -56,9 +56,9 @@ typedef enum {
     FIN_KIT_STATUS_NOT_INITIALIZED   = -10,
 } fin_kit_status_t;
 
-/* ============================================================================
+/*
  * Library configuration
- * ============================================================================ */
+*/
 
 typedef struct {
     int      num_threads;     /* 0 = auto (use all CPUs) */
@@ -67,9 +67,9 @@ typedef struct {
     int      verbose;        /* enable diagnostic output */
 } fin_kit_config_t;
 
-/* ============================================================================
+/*
  * Library init / cleanup
- * ============================================================================ */
+*/
 
 /**
  * @brief Initialize the fin-kit library.
@@ -83,9 +83,9 @@ void fin_kit_lib_init(const fin_kit_config_t* cfg);
  */
 void fin_kit_lib_cleanup(void);
 
-/* ============================================================================
+/*
  * SIMD detection
- * ============================================================================ */
+*/
 
 /**
  * @brief Detect the highest SIMD level supported by the current CPU.
@@ -107,9 +107,9 @@ const char* fin_kit_simd_level_string(fin_kit_simd_level_t level);
  */
 int fin_kit_simd_parallelism(fin_kit_simd_level_t level);
 
-/* ============================================================================
+/*
  * Aligned memory allocation
- * ============================================================================ */
+*/
 
 /**
  * @brief Allocate memory with the given alignment.
@@ -126,9 +126,9 @@ void* fin_kit_aligned_alloc(size_t size, size_t alignment);
  */
 void fin_kit_aligned_free(void* ptr);
 
-/* ============================================================================
+/*
  * Platform info
- * ============================================================================ */
+*/
 
 /**
  * @brief Get the compiler name.
@@ -153,9 +153,9 @@ const char* fin_kit_os_name(void);
  */
 const char* fin_kit_arch_name(void);
 
-/* ============================================================================
+/*
  * Status / error utilities
- * ============================================================================ */
+*/
 
 /**
  * @brief Get a human-readable string for a status code.

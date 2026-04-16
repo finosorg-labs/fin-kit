@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # benchmarks/CMakeLists.txt - Benchmark configuration
-# =============================================================================
+#
 
 if(NOT FC_BUILD_BENCHMARKS)
     message(STATUS "Benchmarks: disabled (FC_BUILD_BENCHMARKS=OFF)")

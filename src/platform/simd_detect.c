@@ -15,9 +15,9 @@
 /* Global SIMD level variable (read-only after initialization, thread-safe) */
 fc_simd_level_t g_fc_simd_level = FC_SIMD_SCALAR;
 
-/* ============================================================================
+/*
  * Platform-specific CPUID detection implementation
- * ============================================================================ */
+*/
 
 #if defined(FC_ARCH_X86) || defined(FC_ARCH_X86_64)
 
@@ -91,9 +91,9 @@ static inline int fc_detect_arm_neon(void) {
 
 #endif /* FC_ARCH_* */
 
-/* ============================================================================
+/*
  * x86/x86_64 SIMD detection
- * ============================================================================ */
+*/
 
 #if defined(FC_ARCH_X86) || defined(FC_ARCH_X86_64)
 
@@ -174,9 +174,9 @@ static fc_simd_level_t fc_detect_simd_generic(void) {
 
 #endif /* FC_ARCH_* */
 
-/* ============================================================================
+/*
  * Public API implementation
- * ============================================================================ */
+*/
 
 fc_simd_level_t fc_detect_simd(void) {
 #if defined(FC_ARCH_X86) || defined(FC_ARCH_X86_64)

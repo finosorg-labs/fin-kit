@@ -18,9 +18,9 @@
 #define FC_CACHE_L2_DEFAULT   (256 * 1024ULL)
 #define FC_CACHE_L3_DEFAULT   (8   * 1024 * 1024ULL)
 
-/* ============================================================================
+/*
  * Cache size retrieval
- * ============================================================================ */
+*/
 
 static size_t fc_get_cache_size_win(DWORD level) {
     DWORD bufferSize = 0;

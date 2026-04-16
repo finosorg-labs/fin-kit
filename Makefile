@@ -21,7 +21,7 @@
 #   Linux deps  : sudo apt install build-essential cmake ninja-build
 #   Windows deps: sudo apt install mingw-w64 cmake make
 #
-# =============================================================================
+#
 
 BUILD_TYPE ?= Release
 CMAKE ?= cmake
@@ -33,6 +33,8 @@ WINDOWS_BUILD_DIR := build/windows_amd64
 LINUX_CONFIG := -G Ninja \
 	-B $(LINUX_BUILD_DIR) \
 	-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+	-DCMAKE_C_FLAGS="-fprofile-arcs -ftest-coverage" \
+	-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage" \
 	-DFC_BUILD_TESTS=ON \
 	-DFC_BUILD_BENCHMARKS=$(shell [ "$(BUILD_TYPE)" = "Release" ] && echo ON || echo OFF)
 
@@ -68,8 +70,8 @@ go:
 	cd go/fin-kit && go build -tags fin_kit_cgo ./...
 
 test: linux
-	@echo "==> Running C tests on Linux"
-	cd $(LINUX_BUILD_DIR) && ctest --output-on-failure
+	@echo "==> Running C tests with coverage"
+	@bash scripts/test_coverage.sh $(LINUX_BUILD_DIR)
 	@echo ""
 	@echo "==> Running Go tests"
 	cd go/fin-kit && go test -tags fin_kit_cgo -v

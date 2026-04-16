@@ -20,15 +20,15 @@
 
 #include "platform/platform.h"
 
-/* =============================================================================
+/*
  * Benchmark framework version
- * ============================================================================= */
+*/
 
 #define FC_BENCH_VERSION "1.0.0"
 
-/* =============================================================================
+/*
  * Timing utilities
- * ============================================================================= */
+*/
 
 /**
  * @brief High-resolution timestamp
@@ -62,9 +62,9 @@ uint64_t fc_bench_time_elapsed_ns(const fc_bench_time_t* start, const fc_bench_t
  */
 uint64_t fc_bench_get_timer_resolution_ns(void);
 
-/* =============================================================================
+/*
  * Benchmark result structure
- * ============================================================================= */
+*/
 
 /**
  * @brief Statistics for a benchmark run
@@ -100,9 +100,9 @@ void fc_bench_result_print_csv(const fc_bench_result_t* result, FILE* fp);
  */
 double fc_bench_result_compare(const fc_bench_result_t* a, const fc_bench_result_t* b);
 
-/* =============================================================================
+/*
  * Benchmark runner
- * ============================================================================= */
+*/
 
 /**
  * @brief Benchmark configuration
@@ -152,9 +152,9 @@ void fc_bench_run(
     fc_bench_result_t* result
 );
 
-/* =============================================================================
+/*
  * Convenience macros for simple benchmarks
- * ============================================================================= */
+*/
 
 /**
  * @brief Simple benchmark with fixed iterations
@@ -198,9 +198,9 @@ void fc_bench_run(
                _elapsed_ms * 1000000.0 / (_iterations)); \
     } while (0)
 
-/* =============================================================================
+/*
  * Throughput and performance metrics
- * ============================================================================= */
+*/
 
 /**
  * @brief Calculate throughput in GB/s
@@ -229,9 +229,9 @@ double fc_bench_gflops(double flops, double elapsed_ms);
  */
 double fc_bench_ops_per_sec(uint64_t ops, double elapsed_ms);
 
-/* =============================================================================
+/*
  * Statistical utilities
- * ============================================================================= */
+*/
 
 /**
  * @brief Running statistics accumulator
@@ -274,9 +274,9 @@ double fc_bench_stats_variance(const fc_bench_stats_t* stats);
  */
 void fc_bench_stats_print(const fc_bench_stats_t* stats, const char* name);
 
-/* =============================================================================
+/*
  * Memory bandwidth estimation
- * ============================================================================= */
+*/
 
 /**
  * @brief Estimate memory bandwidth in GB/s
@@ -292,9 +292,9 @@ double fc_bench_mem_bandwidth_gb_s(
     double elapsed_ms
 );
 
-/* =============================================================================
+/*
  * Benchmark suite management
- * ============================================================================= */
+*/
 
 /**
  * @brief Benchmark suite structure

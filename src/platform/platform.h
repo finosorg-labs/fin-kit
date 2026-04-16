@@ -18,9 +18,9 @@
 #ifndef FC_PLATFORM_H
 #define FC_PLATFORM_H
 
-/* ============================================================================
+/*
  * Compiler detection
- * ============================================================================ */
+*/
 
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_COMPILER_GCC   1
@@ -41,9 +41,9 @@
     #define FC_C_VERSION 199901L
 #endif
 
-/* ============================================================================
+/*
  * Architecture detection
- * ============================================================================ */
+*/
 
 #if defined(__x86_64__)
     #define FC_ARCH_X86_64   1
@@ -82,9 +82,9 @@
     #define FC_ARCH_STRING   "generic"
 #endif
 
-/* ============================================================================
+/*
  * Operating system detection
- * ============================================================================ */
+*/
 
 /* FC_OS_* defaults (may be overridden by toolchain -D flags) */
 #ifndef FC_OS_WINDOWS
@@ -122,9 +122,9 @@
     #define FC_OS_STRING   "Unknown"
 #endif
 
-/* ============================================================================
+/*
  * SIMD instruction support detection (compile-time)
- * ============================================================================ */
+*/
 
 /* SSE4.2 */
 #if defined(__SSE4_2__)
@@ -168,9 +168,9 @@
     #define FC_HAS_NEON 0
 #endif
 
-/* ============================================================================
+/*
  * Export/import macros (ABI compatibility)
- * ============================================================================ */
+*/
 
 #if defined(FC_STATIC_BUILD)
     #define FC_API
@@ -189,9 +189,9 @@
     #endif
 #endif
 
-/* ============================================================================
+/*
  * Base type aliases
- * ============================================================================ */
+*/
 
 #include <stdint.h>
 #include <stddef.h>
@@ -220,9 +220,9 @@ typedef ptrdiff_t fc_ptrdiff_t;
 typedef float     fc_float_t;
 typedef double    fc_double_t;
 
-/* ============================================================================
+/*
  * Function declaration begin/end macros (for C++ compatibility)
- * ============================================================================ */
+*/
 
 #ifdef __cplusplus
     #define FC_BEGIN_DECLS extern "C" {
@@ -232,15 +232,15 @@ typedef double    fc_double_t;
     #define FC_END_DECLS
 #endif
 
-/* ============================================================================
+/*
  * Memory alignment static assertions (C11)
- * ============================================================================ */
+*/
 
 _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer");
 
-/* ============================================================================
+/*
  * Common utility macros
- * ============================================================================ */
+*/
 
 /* Null pointer */
 #define FC_NULL ((void*)0)
@@ -278,9 +278,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 #define FC_MB(x) ((size_t)(x) * 1024 * 1024)
 #define FC_GB(x) ((size_t)(x) * 1024 * 1024 * 1024)
 
-/* ============================================================================
+/*
  * Debug assertions
- * ============================================================================ */
+*/
 
 #if defined(FC_DEBUG) || defined(_DEBUG)
     #define FC_DEBUG_MODE 1
@@ -307,9 +307,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
     } \
 } while (0)
 
-/* ============================================================================
+/*
  * Compiler-specific hints
- * ============================================================================ */
+*/
 
 /* Branch prediction hints */
 #if defined(__GNUC__) || defined(__clang__)
@@ -367,9 +367,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
     #define FC_PACKED
 #endif
 
-/* ============================================================================
+/*
  * Memory barriers and atomic operations
- * ============================================================================ */
+*/
 
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
@@ -399,9 +399,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
         ((*(ptr) == (old_val)) ? ((*(ptr) = (new_val)), 1) : 0)
 #endif
 
-/* ============================================================================
+/*
  * Floating-point control (IEEE 754 guarantees, enabled by default)
- * ============================================================================ */
+*/
 
 #if defined(__GNUC__) || defined(__clang__)
     #define FC_FP_CONTRACT_OFF _Pragma("STDC FP_CONTRACT OFF")
@@ -415,9 +415,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
 #define FC_FP_ROUND_UP            2
 #define FC_FP_ROUND_DOWN          3
 
-/* ============================================================================
+/*
  * Platform-specific optimizations and adjustments
- * ============================================================================ */
+*/
 
 #if FC_ARCH_X86 || FC_ARCH_X86_64
     /* Cache line size (for false sharing avoidance) */
@@ -437,9 +437,9 @@ _Static_assert(sizeof(int) >= 4, "fc_status_t requires at least 32-bit integer")
     #define FC_CACHE_LINE_SIZE 64
 #endif
 
-/* ============================================================================
+/*
  * Miscellaneous utility function declarations
- * ============================================================================ */
+*/
 
 FC_BEGIN_DECLS
 
@@ -473,9 +473,9 @@ FC_API size_t fc_get_l3_cache_size(void);
 
 FC_END_DECLS
 
-/* ============================================================================
+/*
  * Version information (primary source: cmake/version.h.in, fallback below)
- * ============================================================================ */
+*/
 
 /* Include generated version.h if available */
 #if defined(FC_HAS_VERSION_HEADER)

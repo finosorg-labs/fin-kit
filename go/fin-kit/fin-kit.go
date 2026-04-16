@@ -21,9 +21,9 @@ import (
 	"unsafe"
 )
 
-// =============================================================================
+// =
 // Version
-// =============================================================================
+// =
 
 const (
 	VersionMajor = 1
@@ -33,9 +33,9 @@ const (
 
 const Version = "1.0.0"
 
-// =============================================================================
+// =
 // Config
-// =============================================================================
+// =
 
 type Config struct {
 	NumThreads    int
@@ -52,9 +52,9 @@ func DefaultConfig() Config {
 	}
 }
 
-// =============================================================================
+// =
 // Library state
-// =============================================================================
+// =
 
 type libState struct {
 	mu          sync.Mutex
@@ -66,9 +66,9 @@ type libState struct {
 
 var globalState = &libState{}
 
-// =============================================================================
+// =
 // Init / Cleanup
-// =============================================================================
+// =
 
 // Init initializes the fin-kit library with default configuration.
 // Safe to call multiple times; only the first call performs actual init.
@@ -99,7 +99,7 @@ func InitWithConfig(cfg Config) error {
 
 	cCfg := C.fin_kit_config_t{
 		num_threads:     C.int(cfg.NumThreads),
-		enable_avx2:    boolToCInt(cfg.EnableAVX2),
+		enable_avx2:     boolToCInt(cfg.EnableAVX2),
 		memory_limit_mb: C.uint(cfg.MemoryLimitMB),
 		verbose:         boolToCInt(cfg.Verbose),
 	}
@@ -141,16 +141,16 @@ func IsInitialized() bool {
 	return globalState.initialized && !globalState.cleanedUp
 }
 
-// =============================================================================
+// =
 // SIMD support queries
-// =============================================================================
+// =
 
 type SIMDLevel C.fin_kit_simd_level_t
 
 const (
-	SIMDNone  SIMDLevel = 0
-	SIMDSSE42 SIMDLevel = 1
-	SIMDAVX2  SIMDLevel = 2
+	SIMDNone   SIMDLevel = 0
+	SIMDSSE42  SIMDLevel = 1
+	SIMDAVX2   SIMDLevel = 2
 	SIMDAVX512 SIMDLevel = 3
 )
 
@@ -173,14 +173,14 @@ func Parallelism() int {
 	return int(C.fin_kit_simd_parallelism(C.fin_kit_simd_level_t(DetectSIMD())))
 }
 
-// =============================================================================
+// =
 // Status / Error handling
-// =============================================================================
+// =
 
 type Status C.int
 
 const (
-	StatusOK              Status = 0
+	StatusOK             Status = 0
 	StatusError          Status = 1
 	StatusInvalidPointer Status = 2
 	StatusInvalidSize    Status = 3
@@ -209,9 +209,9 @@ func (s Status) String() string {
 	return C.GoString(C.fin_kit_status_string(C.int(s)))
 }
 
-// =============================================================================
+// =
 // Aligned memory allocation
-// =============================================================================
+// =
 
 var (
 	ErrAlignment = errors.New("fin_kit: alignment must be a power of two and >= 1")
@@ -265,9 +265,9 @@ func AlignedFree(data []byte) {
 	// TODO: Redesign API to track allocations properly.
 }
 
-// =============================================================================
+// =
 // Platform info
-// =============================================================================
+// =
 
 func Compiler() string {
 	return C.GoString(C.fin_kit_compiler_name())
@@ -285,9 +285,9 @@ func Arch() string {
 	return C.GoString(C.fin_kit_arch_name())
 }
 
-// =============================================================================
+// =
 // Helpers
-// =============================================================================
+// =
 
 func boolToCInt(b bool) C.int {
 	if b {

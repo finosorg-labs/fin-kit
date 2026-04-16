@@ -9,9 +9,9 @@
 
 #include <sys/sysctl.h>
 
-/* ============================================================================
+/*
  * Cache size retrieval using sysctl
- * ============================================================================ */
+*/
 
 #define FC_CACHE_L1_INTEL_DEFAULT (32 * 1024ULL)
 #define FC_CACHE_L2_INTEL_DEFAULT (256 * 1024ULL)

@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # CompilerFlags.cmake - Compiler-specific flags for different SIMD levels
-# =============================================================================
+#
 
 set(FC_AVX512_FLAGS "-mavx512f -mavx512dq -mavx512bw")
 set(FC_AVX2_FLAGS   "-mavx2 -mfma")

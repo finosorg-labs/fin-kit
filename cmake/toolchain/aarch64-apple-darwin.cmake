@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # cmake/toolchain/aarch64-apple-darwin.cmake — macOS ARM64 cross-compilation toolchain
-# =============================================================================
+#
 #
 # Prerequisites (Linux):
 #   - clang with arm64-apple-darwin target support

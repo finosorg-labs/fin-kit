@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# =============================================================================
+#
 # generate_reference.py - Generate reference values for testing
-# =============================================================================
+#
 
 import os
 import sys

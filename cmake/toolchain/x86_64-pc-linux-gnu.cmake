@@ -1,6 +1,6 @@
-# =============================================================================
+#
 # cmake/toolchain/x86_64-pc-linux-gnu.cmake — Linux amd64 native toolchain
-# =============================================================================
+#
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)

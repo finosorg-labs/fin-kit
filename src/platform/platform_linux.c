@@ -10,9 +10,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-/* ============================================================================
+/*
  * Cache size retrieval
- * ============================================================================ */
+*/
 
 /* Read a single numeric value (with K/M/G suffix) from a sysfs file */
 static size_t fc_read_cache_size(const char* path) {

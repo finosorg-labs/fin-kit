@@ -19,9 +19,9 @@
 
 #include "platform/platform.h"
 
-/* =============================================================================
+/*
  * Test framework configuration
- * ============================================================================= */
+*/
 
 #define FC_TEST_VERSION "1.0.0"
 
@@ -40,9 +40,9 @@
  */
 #define FC_TEST_MAX_MSG_LEN 512
 
-/* =============================================================================
+/*
  * Test result types
- * ============================================================================= */
+*/
 
 /**
  * @brief Test result enumeration
@@ -53,15 +53,15 @@ typedef enum {
     FC_TEST_SKIPPED = 2,
 } fc_test_result_t;
 
-/* =============================================================================
+/*
  * Test function pointer type
- * ============================================================================= */
+*/
 
 typedef void (*fc_test_fn)(void);
 
-/* =============================================================================
+/*
  * Test statistics
- * ============================================================================= */
+*/
 
 /**
  * @brief Statistics for a test run
@@ -84,9 +84,9 @@ void fc_test_stats_init(fc_test_stats_t* stats);
  */
 void fc_test_stats_print(const fc_test_stats_t* stats);
 
-/* =============================================================================
+/*
  * Assertion macros
- * ============================================================================= */
+*/
 
 /**
  * @brief Basic assertion that condition is true
@@ -233,9 +233,9 @@ void fc_test_stats_print(const fc_test_stats_t* stats);
         return; \
     } while (0)
 
-/* =============================================================================
+/*
  * Internal assertion failure functions
- * ============================================================================= */
+*/
 
 FC_BEGIN_DECLS
 
@@ -310,9 +310,9 @@ FC_API void fc_test_skip(const char* message);
 
 FC_END_DECLS
 
-/* =============================================================================
+/*
  * Test suite management
- * ============================================================================= */
+*/
 
 /**
  * @brief Test suite structure
@@ -359,6 +359,23 @@ fc_test_stats_t* fc_test_get_stats(void);
 void fc_test_set_verbose(int verbose);
 
 /**
+ * @brief Enable coverage reporting
+ *
+ * @param enable 1 to enable, 0 to disable
+ */
+void fc_test_set_coverage(int enable);
+
+/**
+ * @brief Generate coverage report
+ *
+ * Generates coverage report using gcov if enabled.
+ * Should be called after all tests complete.
+ *
+ * @return 0 on success, non-zero on error
+ */
+int fc_test_generate_coverage_report(void);
+
+/**
  * @brief Set test filter pattern
  *
  * Only tests matching the pattern will be run.
@@ -370,6 +387,14 @@ void fc_test_set_filter(const char* pattern);
 
 /**
  * @brief Initialize test framework
+ *
+ * @param argc Command line argument count
+ * @param argv Command line arguments
+ */
+void fc_test_init_with_args(int argc, char** argv);
+
+/**
+ * @brief Initialize test framework
  */
 void fc_test_init(void);
 
@@ -378,9 +403,9 @@ void fc_test_init(void);
  */
 void fc_test_cleanup(void);
 
-/* =============================================================================
+/*
  * Test suite registration macros
- * ============================================================================= */
+*/
 
 /**
  * @brief Define a test function
@@ -408,9 +433,9 @@ void fc_test_cleanup(void);
         fc_test_run_suite(#suite); \
     } while (0)
 
-/* =============================================================================
+/*
  * Internal test runner state
- * ============================================================================= */
+*/
 
 FC_BEGIN_DECLS
 
@@ -441,9 +466,9 @@ FC_API double fc_test_get_elapsed_ms(void);
 
 FC_END_DECLS
 
-/* =============================================================================
+/*
  * Memory tracking utilities
- * ============================================================================= */
+*/
 
 /**
  * @brief Enable memory leak detection
@@ -463,5 +488,59 @@ int fc_test_check_leaks(void);
  * @brief Print memory leak report
  */
 void fc_test_print_leak_report(void);
+
+/*
+ * Convenience macros for simpler test syntax
+*/
+
+/**
+ * @brief Define a simple test function
+ */
+#define TEST(name) \
+    static void name##_impl(void); \
+    static void name(void) { \
+        fc_test_start(#name); \
+        name##_impl(); \
+        fc_test_end(); \
+    } \
+    static void name##_impl(void)
+
+/**
+ * @brief Run a test function
+ */
+#define RUN_TEST(test_func) \
+    do { \
+        test_func(); \
+    } while (0)
+
+/**
+ * @brief Assert equality (uses FC_TEST_ASSERT_EQ)
+ */
+#define ASSERT_EQ(actual, expected) FC_TEST_ASSERT_EQ((actual), (expected))
+
+/**
+ * @brief Assert inequality (uses FC_TEST_ASSERT_NE)
+ */
+#define ASSERT_NE(actual, expected) FC_TEST_ASSERT_NE((actual), (expected))
+
+/**
+ * @brief Assert true (uses FC_TEST_ASSERT)
+ */
+#define ASSERT_TRUE(cond) FC_TEST_ASSERT(cond)
+
+/**
+ * @brief Assert false
+ */
+#define ASSERT_FALSE(cond) FC_TEST_ASSERT(!(cond))
+
+/**
+ * @brief Assert NULL
+ */
+#define ASSERT_NULL(ptr) FC_TEST_ASSERT((ptr) == NULL)
+
+/**
+ * @brief Assert not NULL
+ */
+#define ASSERT_NOT_NULL(ptr) FC_TEST_ASSERT((ptr) != NULL)
 
 #endif /* FC_TEST_FRAMEWORK_H */
