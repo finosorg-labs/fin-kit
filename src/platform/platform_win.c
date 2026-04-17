@@ -5,7 +5,7 @@
  * Provides Windows platform cache size detection and other system information.
  */
 
-#include "platform.h"
+#include <fin-kit/platform/platform.h>
 
 #if defined(FC_OS_WINDOWS)
 

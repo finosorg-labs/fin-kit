@@ -4,13 +4,19 @@
  *
  * Selects optimal GEMM implementation based on CPU features.
  * Dispatch order: AVX-512 > AVX2 > SSE4.2 > Scalar
+ *
+ * The public API accepts int64_t dimensions for future-proofing.
+ * Internal SIMD kernels use int for loop indices (sufficient for
+ * practical matrix sizes and avoids SIMD register width issues).
  */
 
-#include "fin-kit/matrix.h"
-#include "../platform/simd_detect.h"
-#include "../platform/error.h"
+#include <fin-kit/matrix/matrix.h>
+#include <fin-kit/platform/simd_detect.h>
+#include <fin-kit/platform/error.h>
 
-/* Forward declarations of internal implementations */
+#include <limits.h>
+
+/* Forward declarations of internal implementations (int dimensions) */
 extern int fc_mat_gemm_f64_scalar(int m, int n, int k,
                                   double alpha,
                                   const double* A, int lda,
@@ -25,35 +31,50 @@ extern int fc_mat_gemm_f64_sse42(int m, int n, int k,
                                  double beta,
                                  double* C, int ldc);
 
-/**
- * @brief GEMM dispatch - selects best implementation at runtime
- *
- * @param m Number of rows in A and C
- * @param n Number of columns in B and C
- * @param k Number of columns in A and rows in B
- * @param alpha Scalar multiplier for A*B
- * @param A Input matrix A (m x k)
- * @param lda Leading dimension of A (>= k)
- * @param B Input matrix B (k x n)
- * @param ldb Leading dimension of B (>= n)
- * @param beta Scalar multiplier for C
- * @param C Output matrix C (m x n), C = alpha*A*B + beta*C
- * @param ldc Leading dimension of C (>= n)
- * @return FC_OK on success, error code otherwise
- */
-int fc_mat_gemm_f64(int m, int n, int k,
-                    double alpha,
-                    const double* A, int lda,
-                    const double* B, int ldb,
-                    double beta,
-                    double* C, int ldc) {
-    fc_simd_level_t level = fc_get_simd_level();
+extern int fc_mat_gemm_f64_avx2(int m, int n, int k,
+                                double alpha,
+                                const double* A, int lda,
+                                const double* B, int ldb,
+                                double beta,
+                                double* C, int ldc);
 
-    /* Dispatch to best available implementation */
-    if (level >= FC_SIMD_SSE42) {
-        return fc_mat_gemm_f64_sse42(m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+extern int fc_mat_gemm_f64_avx512(int m, int n, int k,
+                                  double alpha,
+                                  const double* A, int lda,
+                                  const double* B, int ldb,
+                                  double beta,
+                                  double* C, int ldc);
+
+int fc_mat_gemm_f64(int64_t m, int64_t n, int64_t k,
+                    double alpha,
+                    const double* A, int64_t lda,
+                    const double* B, int64_t ldb,
+                    double beta,
+                    double* C, int64_t ldc) {
+    if (m <= 0 || n <= 0 || k <= 0) {
+        return FC_ERR_INVALID_ARG;
+    }
+    if (m > INT_MAX || n > INT_MAX || k > INT_MAX ||
+        lda > INT_MAX || ldb > INT_MAX || ldc > INT_MAX) {
+        return FC_ERR_INVALID_ARG;
     }
 
-    /* Fallback to scalar */
-    return fc_mat_gemm_f64_scalar(m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    int mi = (int)m, ni = (int)n, ki = (int)k;
+    int ldai = (int)lda, ldbi = (int)ldb, ldci = (int)ldc;
+
+    fc_simd_level_t level = fc_get_simd_level();
+
+    if (level >= FC_SIMD_AVX512) {
+        return fc_mat_gemm_f64_avx512(mi, ni, ki, alpha, A, ldai, B, ldbi, beta, C, ldci);
+    }
+
+    if (level >= FC_SIMD_AVX2) {
+        return fc_mat_gemm_f64_avx2(mi, ni, ki, alpha, A, ldai, B, ldbi, beta, C, ldci);
+    }
+
+    if (level >= FC_SIMD_SSE42) {
+        return fc_mat_gemm_f64_sse42(mi, ni, ki, alpha, A, ldai, B, ldbi, beta, C, ldci);
+    }
+
+    return fc_mat_gemm_f64_scalar(mi, ni, ki, alpha, A, ldai, B, ldbi, beta, C, ldci);
 }

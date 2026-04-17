@@ -11,14 +11,13 @@ endif()
 add_executable(finkit_benchmarks
     bench_framework.c
     bench_main.c
-    # Add individual module benchmark files here as they are created
+    bench_matrix.c
 )
 
-# Link with platform library and math library
+# Link with combined library (includes platform + matrix)
 target_link_libraries(finkit_benchmarks
     PRIVATE
-        finkit::platform
-        m
+        finkit::finkit
 )
 
 target_compile_definitions(finkit_benchmarks PRIVATE FC_STATIC_BUILD)
@@ -26,7 +25,7 @@ target_compile_definitions(finkit_benchmarks PRIVATE FC_STATIC_BUILD)
 # Include directories
 target_include_directories(finkit_benchmarks
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
 )
 

@@ -28,7 +28,7 @@ target_compile_definitions(finkit_platform PRIVATE FC_STATIC_BUILD)
 # Set include directories for this library
 target_include_directories(finkit_platform
     PUBLIC
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_BINARY_DIR}/include
 )
@@ -40,18 +40,11 @@ target_compile_options(finkit_platform PRIVATE -Wall -Wextra -Wpedantic -ffp-con
 add_library(finkit_platform_static STATIC $<TARGET_OBJECTS:finkit_platform>)
 target_include_directories(finkit_platform_static
     PUBLIC
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
 )
 
-# Install platform headers
-install(
-    FILES
-        platform.h
-        simd_detect.h
-        mem_aligned.h
-        error.h
-    DESTINATION include/fin-kit/platform
-)
+# Install platform headers (already in include/fin-kit/platform/)
+# No need to install - headers are already in the right place
 
 # Alias for use in other parts of the project
 add_library(finkit::platform ALIAS finkit_platform_static)

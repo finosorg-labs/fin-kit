@@ -7,14 +7,16 @@
 
 #include <math.h>
 #include <float.h>
-#include "../platform/platform.h"
-#include "../platform/error.h"
+#include <stdint.h>
+#include <limits.h>
+#include <fin-kit/platform/platform.h>
+#include <fin-kit/platform/error.h>
 
 /*
  * Input validation helpers
 */
 
-static FC_INLINE int validate_vector_inputs(const double* x, const double* y, int n) {
+static FC_INLINE int validate_vector_inputs(const double* x, const double* y, int64_t n) {
     if (x == NULL || y == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -24,7 +26,7 @@ static FC_INLINE int validate_vector_inputs(const double* x, const double* y, in
     return FC_OK;
 }
 
-static FC_INLINE int validate_single_vector(const double* x, int n) {
+static FC_INLINE int validate_single_vector(const double* x, int64_t n) {
     if (x == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -44,7 +46,7 @@ static FC_INLINE int validate_single_vector(const double* x, int n) {
  * Uses compensated summation to reduce floating-point rounding errors.
  * This is critical for financial applications where precision matters.
  */
-int fc_vec_dot_f64(const double* x, const double* y, int n, double* result) {
+int fc_vec_dot_f64(const double* x, const double* y, int64_t n, double* result) {
     if (result == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -58,7 +60,7 @@ int fc_vec_dot_f64(const double* x, const double* y, int n, double* result) {
     double sum = 0.0;
     double c = 0.0;  /* Running compensation for lost low-order bits */
 
-    for (int i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         double product = x[i] * y[i];
         double y_val = product - c;
         double t = sum + y_val;
@@ -80,7 +82,7 @@ int fc_vec_dot_f64(const double* x, const double* y, int n, double* result) {
  * Uses scaling technique to avoid overflow for large values and
  * underflow for small values, following BLAS dnrm2 approach.
  */
-int fc_vec_norm_l2_f64(const double* x, int n, double* result) {
+int fc_vec_norm_l2_f64(const double* x, int64_t n, double* result) {
     if (result == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -99,7 +101,7 @@ int fc_vec_norm_l2_f64(const double* x, int n, double* result) {
     double scale = 0.0;
     double ssq = 1.0;  /* Sum of squares */
 
-    for (int i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         double abs_val = fabs(x[i]);
 
         if (abs_val > 0.0) {
@@ -125,7 +127,7 @@ int fc_vec_norm_l2_f64(const double* x, int n, double* result) {
 /**
  * @brief Compute L1 norm using Kahan summation
  */
-int fc_vec_norm_l1_f64(const double* x, int n, double* result) {
+int fc_vec_norm_l1_f64(const double* x, int64_t n, double* result) {
     if (result == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -139,7 +141,7 @@ int fc_vec_norm_l1_f64(const double* x, int n, double* result) {
     double sum = 0.0;
     double c = 0.0;
 
-    for (int i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         double abs_val = fabs(x[i]);
         double y_val = abs_val - c;
         double t = sum + y_val;
@@ -160,7 +162,7 @@ int fc_vec_norm_l1_f64(const double* x, int n, double* result) {
  *
  * Computes ||x - y||_2 using the same scaling technique as L2 norm.
  */
-int fc_vec_distance_l2_f64(const double* x, const double* y, int n, double* result) {
+int fc_vec_distance_l2_f64(const double* x, const double* y, int64_t n, double* result) {
     if (result == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -179,7 +181,7 @@ int fc_vec_distance_l2_f64(const double* x, const double* y, int n, double* resu
     double scale = 0.0;
     double ssq = 1.0;
 
-    for (int i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         double diff = x[i] - y[i];
         double abs_diff = fabs(diff);
 
@@ -206,7 +208,7 @@ int fc_vec_distance_l2_f64(const double* x, const double* y, int n, double* resu
 /**
  * @brief Compute Manhattan distance using Kahan summation
  */
-int fc_vec_distance_l1_f64(const double* x, const double* y, int n, double* result) {
+int fc_vec_distance_l1_f64(const double* x, const double* y, int64_t n, double* result) {
     if (result == NULL) {
         return FC_ERR_INVALID_ARG;
     }
@@ -220,7 +222,7 @@ int fc_vec_distance_l1_f64(const double* x, const double* y, int n, double* resu
     double sum = 0.0;
     double c = 0.0;
 
-    for (int i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         double abs_diff = fabs(x[i] - y[i]);
         double y_val = abs_diff - c;
         double t = sum + y_val;

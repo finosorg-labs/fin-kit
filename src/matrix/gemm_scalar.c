@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include "../platform/platform.h"
-#include "../platform/error.h"
+#include <fin-kit/platform/platform.h>
+#include <fin-kit/platform/error.h>
 
 /*
  * Configuration constants

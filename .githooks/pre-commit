@@ -58,10 +58,10 @@ run_sanitizer_suite "MSan" "clang" "build/sanitizer-msan" "memory"
 # Stage 3: Go checks
 if [[ -d "go/fin-kit" ]]; then
   echo "[pre-commit] Stage 3/4: go vet"
-  (cd go/fin-kit && CC=gcc go vet -tags fin_kit_cgo ./...)
+  (cd go/fin-kit && CC=gcc go vet ./...)
 
   echo "[pre-commit] Stage 4/4: go test"
-  (cd go/fin-kit && CC=gcc go test -tags fin_kit_cgo ./...)
+  (cd go/fin-kit && CC=gcc go test ./...)
 fi
 
 echo "[pre-commit] All strict checks passed."

@@ -12,7 +12,7 @@ add_executable(finkit_tests
     test_framework.c
     test_main.c
     test_matrix.c
-    # Add individual module test files here as they are created
+    test_precision.c
 )
 
 # Link with finkit library (includes all modules)
@@ -22,12 +22,15 @@ target_link_libraries(finkit_tests
         m
 )
 
-target_compile_definitions(finkit_tests PRIVATE FC_STATIC_BUILD)
+target_compile_definitions(finkit_tests PRIVATE
+    FC_STATIC_BUILD
+    FC_ENABLE_INTERNAL_TESTS
+)
 
 # Include directories
 target_include_directories(finkit_tests
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
 )
 

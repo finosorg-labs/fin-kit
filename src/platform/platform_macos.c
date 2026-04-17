@@ -5,7 +5,7 @@
  * Provides macOS platform cache size detection and other system information.
  */
 
-#include "platform.h"
+#include <fin-kit/platform/platform.h>
 
 #include <sys/sysctl.h>
 

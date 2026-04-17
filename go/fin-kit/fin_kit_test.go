@@ -1,11 +1,9 @@
-//go:build fin_kit_cgo
-
 package fin_kit
-import "unsafe"
 
 import (
 	"runtime"
 	"testing"
+	"unsafe"
 )
 
 func TestInit(t *testing.T) {
@@ -74,7 +72,7 @@ func TestSIMDDetect(t *testing.T) {
 	t.Logf("Detected SIMD level: %s", level.String())
 
 	// SIMD level should be valid
-	if level < SIMDNone || level > SIMDAVX512 {
+	if level < SIMDScalar || level > SIMDAVX512 {
 		t.Errorf("Invalid SIMD level: %d", level)
 	}
 
@@ -121,8 +119,8 @@ func TestHasSIMD(t *testing.T) {
 	defer Cleanup()
 
 	// All CPUs should support at least scalar operations
-	if !HasSIMD(SIMDNone) {
-		t.Error("HasSIMD(SIMDNone) returned false")
+	if !HasSIMD(SIMDScalar) {
+		t.Error("HasSIMD(SIMDScalar) returned false")
 	}
 
 	// Log what SIMD levels are supported
@@ -130,7 +128,7 @@ func TestHasSIMD(t *testing.T) {
 		level SIMDLevel
 		name  string
 	}{
-		{SIMDNone, "Scalar"},
+		{SIMDScalar, "Scalar"},
 		{SIMDSSE42, "SSE4.2"},
 		{SIMDAVX2, "AVX2"},
 		{SIMDAVX512, "AVX-512"},
@@ -259,7 +257,7 @@ func TestStatus(t *testing.T) {
 	}{
 		{StatusOK, "Success"},
 		{StatusError, ""},
-		{StatusInvalidPointer, ""},
+		{StatusInvalidArg, ""},
 	}
 
 	for _, tt := range tests {

@@ -18,6 +18,7 @@
 
 #include <fin-kit/version.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +44,7 @@ extern "C" {
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_vec_dot_f64(const double* x, const double* y, int n, double* result);
+int fc_vec_dot_f64(const double* x, const double* y, int64_t n, double* result);
 
 /**
  * @brief Compute L2 norm (Euclidean norm) of a double-precision vector
@@ -60,7 +61,7 @@ int fc_vec_dot_f64(const double* x, const double* y, int n, double* result);
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_vec_norm_l2_f64(const double* x, int n, double* result);
+int fc_vec_norm_l2_f64(const double* x, int64_t n, double* result);
 
 /**
  * @brief Compute L1 norm (Manhattan norm) of a double-precision vector
@@ -77,7 +78,7 @@ int fc_vec_norm_l2_f64(const double* x, int n, double* result);
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_vec_norm_l1_f64(const double* x, int n, double* result);
+int fc_vec_norm_l1_f64(const double* x, int64_t n, double* result);
 
 /**
  * @brief Compute Euclidean distance between two double-precision vectors
@@ -95,7 +96,7 @@ int fc_vec_norm_l1_f64(const double* x, int n, double* result);
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_vec_distance_l2_f64(const double* x, const double* y, int n, double* result);
+int fc_vec_distance_l2_f64(const double* x, const double* y, int64_t n, double* result);
 
 /**
  * @brief Compute Manhattan distance between two double-precision vectors
@@ -113,10 +114,10 @@ int fc_vec_distance_l2_f64(const double* x, const double* y, int n, double* resu
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_vec_distance_l1_f64(const double* x, const double* y, int n, double* result);
+int fc_vec_distance_l1_f64(const double* x, const double* y, int64_t n, double* result);
 
 /*
- * Matrix multiplication (M01-01)
+ * Matrix multiplication
 */
 
 /**
@@ -146,12 +147,77 @@ int fc_vec_distance_l1_f64(const double* x, const double* y, int n, double* resu
  *
  * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
  */
-int fc_mat_gemm_f64(int m, int n, int k,
+int fc_mat_gemm_f64(int64_t m, int64_t n, int64_t k,
                     double alpha,
-                    const double* A, int lda,
-                    const double* B, int ldb,
+                    const double* A, int64_t lda,
+                    const double* B, int64_t ldb,
                     double beta,
-                    double* C, int ldc);
+                    double* C, int64_t ldc);
+
+/*
+ * Matrix-vector multiplication
+*/
+
+/**
+ * @brief General Matrix-Vector Multiply (GEMV) for double-precision
+ *
+ * Computes: y = alpha * A * x + beta * y
+ * where A is m×n, x is n×1, y is m×1
+ *
+ * Matrix A is stored in row-major order.
+ * Automatically selects optimal SIMD implementation based on CPU capabilities.
+ *
+ * Time complexity: O(m * n)
+ * Space complexity: O(1) (in-place update of y)
+ * Thread safety: Thread-safe (no shared state)
+ *
+ * @param[in]    m      Number of rows in A
+ * @param[in]    n      Number of columns in A
+ * @param[in]    alpha  Scalar multiplier for A*x
+ * @param[in]    A      Matrix A (m×n, row-major)
+ * @param[in]    lda    Leading dimension of A (stride, typically n)
+ * @param[in]    x      Vector x (length n)
+ * @param[in]    beta   Scalar multiplier for y
+ * @param[inout] y      Vector y (length m), updated in-place
+ *
+ * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
+ */
+int fc_mat_gemv_f64(int64_t m, int64_t n,
+                    double alpha,
+                    const double* A, int64_t lda,
+                    const double* x,
+                    double beta,
+                    double* y);
+
+/*
+ * Matrix transpose
+*/
+
+/**
+ * @brief Transpose a double-precision matrix
+ *
+ * Computes: dst = src^T
+ * where src is rows×cols, dst is cols×rows
+ *
+ * Uses cache-friendly blocking for large matrices.
+ * Automatically selects optimal SIMD implementation based on CPU capabilities.
+ *
+ * Time complexity: O(rows * cols)
+ * Space complexity: O(1)
+ * Thread safety: Thread-safe (no shared state)
+ *
+ * @param[in]  rows   Number of rows in source matrix
+ * @param[in]  cols   Number of columns in source matrix
+ * @param[in]  src    Source matrix (rows×cols, row-major)
+ * @param[in]  ld_src Leading dimension of source (stride between rows)
+ * @param[out] dst    Destination matrix (cols×rows, row-major)
+ * @param[in]  ld_dst Leading dimension of destination (stride between rows)
+ *
+ * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid
+ */
+int fc_mat_transpose_f64(int64_t rows, int64_t cols,
+                         const double* src, int64_t ld_src,
+                         double* dst, int64_t ld_dst);
 
 #ifdef __cplusplus
 }

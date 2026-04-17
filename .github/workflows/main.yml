@@ -388,19 +388,19 @@ jobs:
         working-directory: go/fin-kit
         env:
           CC: gcc
-        run: go build -tags fin_kit_cgo ./...
+        run: go build ./...
 
       - name: Vet
         working-directory: go/fin-kit
         env:
           CC: gcc
-        run: go vet -tags fin_kit_cgo ./...
+        run: go vet ./...
 
       - name: Test
         working-directory: go/fin-kit
         env:
           CC: gcc
-        run: go test -tags fin_kit_cgo ./...
+        run: go test ./...
 
   # =========================================================================
   # Build summary

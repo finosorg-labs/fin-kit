@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "platform/platform.h"
+#include <fin-kit/platform/platform.h>
 
 /*
  * Benchmark framework version

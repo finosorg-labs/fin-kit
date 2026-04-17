@@ -4,25 +4,30 @@
  *
  * Implements SSE4.2 SIMD instructions.
  * Uses 4x4 micro-kernel optimized for SSE registers (128-bit, 2 doubles).
+ * Includes software prefetching to reduce cache miss latency.
  */
 
 #include <string.h>
-#include "../platform/platform.h"
-#include "../platform/error.h"
+#include <fin-kit/platform/platform.h>
+#include <fin-kit/platform/error.h>
 
 #if FC_HAS_SSE42
 #include <emmintrin.h>  /* SSE2 */
 #include <smmintrin.h>  /* SSE4.2 */
+
+/* Prefetch distance (iterations ahead to prefetch) */
+#define PREFETCH_DISTANCE 8
 
 /*
  * SSE4.2 optimized 4x4 micro-kernel
 */
 
 /**
- * @brief 4x4 micro-kernel using SSE2 intrinsics
+ * @brief 4x4 micro-kernel using SSE2 intrinsics with prefetching
  *
  * Processes 4x4 block of C using SSE registers.
  * Each SSE register holds 2 doubles, so we process 2 columns at a time.
+ * Prefetches A and B data ahead to hide memory latency.
  */
 static void gemm_micro_kernel_4x4_sse42(int k,
                                          const double* A, int lda,
@@ -41,6 +46,15 @@ static void gemm_micro_kernel_4x4_sse42(int k,
 
     /* Compute A * B */
     for (int p = 0; p < k; p++) {
+        /* Prefetch A and B data ahead */
+        if (p + PREFETCH_DISTANCE < k) {
+            _mm_prefetch((const char*)&A[0 * lda + p + PREFETCH_DISTANCE], _MM_HINT_T0);
+            _mm_prefetch((const char*)&A[1 * lda + p + PREFETCH_DISTANCE], _MM_HINT_T0);
+            _mm_prefetch((const char*)&A[2 * lda + p + PREFETCH_DISTANCE], _MM_HINT_T0);
+            _mm_prefetch((const char*)&A[3 * lda + p + PREFETCH_DISTANCE], _MM_HINT_T0);
+            _mm_prefetch((const char*)&B[(p + PREFETCH_DISTANCE) * ldb + 0], _MM_HINT_T0);
+        }
+
         /* Load A column (4 elements) */
         double a0 = A[0 * lda + p];
         double a1 = A[1 * lda + p];

@@ -6,8 +6,8 @@
  * Supports x86/x86_64 architecture on Linux, Windows, and macOS.
  */
 
-#include "simd_detect.h"
-#include "platform.h"
+#include <fin-kit/platform/simd_detect.h>
+#include <fin-kit/platform/platform.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>

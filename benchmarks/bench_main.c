@@ -4,14 +4,23 @@
  */
 
 #include "bench_framework.h"
+#include <fin-kit/platform/simd_detect.h>
 #include <stdio.h>
+
+/* External benchmark suites */
+extern void bench_matrix_run(void);
 
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    printf("fin-kit benchmark framework\n");
-    printf("NOTE: No benchmarks registered yet.\n");
-    printf("      Add benchmark files to benchmarks/ directory to enable tests.\n");
+    fc_bench_init();
+    fc_detect_simd();
+
+    printf("fin-kit performance benchmarks v%s\n", FC_BENCH_VERSION);
+
+    bench_matrix_run();
+
+    fc_bench_cleanup();
     return 0;
 }
