@@ -21,8 +21,8 @@
 #define GEMM_NC 4096 /* Block size for N dimension */
 
 /* Micro-kernel size for register blocking */
-#define GEMM_MR 4    /* Micro-panel height */
-#define GEMM_NR 4    /* Micro-panel width */
+#define GEMM_MR 8    /* Micro-panel height */
+#define GEMM_NR 8    /* Micro-panel width */
 
 /*
  * Input validation
@@ -45,120 +45,86 @@ static int validate_gemm_inputs(int m, int n, int k,
 }
 
 /*
- * Micro-kernel: 4x4 register-blocked multiplication
+ * Micro-kernel: 8x8 register-blocked multiplication
 */
 
 /**
- * @brief 4x4 micro-kernel for GEMM
+ * @brief 8x8 micro-kernel for GEMM
  *
- * Computes a 4x4 block of C using register blocking.
- * This is the innermost computational kernel.
+ * Computes an 8x8 block of C using register blocking.
+ * This is the innermost computational kernel optimized for better register utilization.
  */
-static void gemm_micro_kernel_4x4(int k,
+static void gemm_micro_kernel_8x8(int k,
                                    const double* A, int lda,
                                    const double* B, int ldb,
                                    double* C, int ldc,
                                    double alpha, double beta) {
-    /* Accumulate in registers */
-    double c00 = 0.0, c01 = 0.0, c02 = 0.0, c03 = 0.0;
-    double c10 = 0.0, c11 = 0.0, c12 = 0.0, c13 = 0.0;
-    double c20 = 0.0, c21 = 0.0, c22 = 0.0, c23 = 0.0;
-    double c30 = 0.0, c31 = 0.0, c32 = 0.0, c33 = 0.0;
+    /* Accumulate in registers (64 accumulators for 8x8 block) */
+    double c[8][8];
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            c[i][j] = 0.0;
+        }
+    }
 
-    /* Compute A * B */
+    /* Compute A * B with software prefetching */
     for (int p = 0; p < k; p++) {
-        /* Load A column */
-        double a0 = A[0 * lda + p];
-        double a1 = A[1 * lda + p];
-        double a2 = A[2 * lda + p];
-        double a3 = A[3 * lda + p];
+        /* Prefetch next iteration */
+        if (p + 8 < k) {
+            __builtin_prefetch(&A[0 * lda + p + 8], 0, 3);
+            __builtin_prefetch(&B[(p + 8) * ldb], 0, 3);
+        }
 
-        /* Load B row */
-        double b0 = B[p * ldb + 0];
-        double b1 = B[p * ldb + 1];
-        double b2 = B[p * ldb + 2];
-        double b3 = B[p * ldb + 3];
+        /* Load A column (8 elements) */
+        double a[8];
+        for (int i = 0; i < 8; i++) {
+            a[i] = A[i * lda + p];
+        }
 
-        /* Outer product */
-        c00 += a0 * b0; c01 += a0 * b1; c02 += a0 * b2; c03 += a0 * b3;
-        c10 += a1 * b0; c11 += a1 * b1; c12 += a1 * b2; c13 += a1 * b3;
-        c20 += a2 * b0; c21 += a2 * b1; c22 += a2 * b2; c23 += a2 * b3;
-        c30 += a3 * b0; c31 += a3 * b1; c32 += a3 * b2; c33 += a3 * b3;
+        /* Load B row (8 elements) */
+        double b[8];
+        for (int j = 0; j < 8; j++) {
+            b[j] = B[p * ldb + j];
+        }
+
+        /* Outer product: unrolled for better instruction-level parallelism */
+        for (int i = 0; i < 8; i++) {
+            c[i][0] += a[i] * b[0];
+            c[i][1] += a[i] * b[1];
+            c[i][2] += a[i] * b[2];
+            c[i][3] += a[i] * b[3];
+            c[i][4] += a[i] * b[4];
+            c[i][5] += a[i] * b[5];
+            c[i][6] += a[i] * b[6];
+            c[i][7] += a[i] * b[7];
+        }
     }
 
     /* Update C with alpha * A*B + beta * C */
     if (beta == 0.0) {
-        C[0 * ldc + 0] = alpha * c00;
-        C[0 * ldc + 1] = alpha * c01;
-        C[0 * ldc + 2] = alpha * c02;
-        C[0 * ldc + 3] = alpha * c03;
-
-        C[1 * ldc + 0] = alpha * c10;
-        C[1 * ldc + 1] = alpha * c11;
-        C[1 * ldc + 2] = alpha * c12;
-        C[1 * ldc + 3] = alpha * c13;
-
-        C[2 * ldc + 0] = alpha * c20;
-        C[2 * ldc + 1] = alpha * c21;
-        C[2 * ldc + 2] = alpha * c22;
-        C[2 * ldc + 3] = alpha * c23;
-
-        C[3 * ldc + 0] = alpha * c30;
-        C[3 * ldc + 1] = alpha * c31;
-        C[3 * ldc + 2] = alpha * c32;
-        C[3 * ldc + 3] = alpha * c33;
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                C[i * ldc + j] = alpha * c[i][j];
+            }
+        }
     } else {
-        C[0 * ldc + 0] = alpha * c00 + beta * C[0 * ldc + 0];
-        C[0 * ldc + 1] = alpha * c01 + beta * C[0 * ldc + 1];
-        C[0 * ldc + 2] = alpha * c02 + beta * C[0 * ldc + 2];
-        C[0 * ldc + 3] = alpha * c03 + beta * C[0 * ldc + 3];
-
-        C[1 * ldc + 0] = alpha * c10 + beta * C[1 * ldc + 0];
-        C[1 * ldc + 1] = alpha * c11 + beta * C[1 * ldc + 1];
-        C[1 * ldc + 2] = alpha * c12 + beta * C[1 * ldc + 2];
-        C[1 * ldc + 3] = alpha * c13 + beta * C[1 * ldc + 3];
-
-        C[2 * ldc + 0] = alpha * c20 + beta * C[2 * ldc + 0];
-        C[2 * ldc + 1] = alpha * c21 + beta * C[2 * ldc + 1];
-        C[2 * ldc + 2] = alpha * c22 + beta * C[2 * ldc + 2];
-        C[2 * ldc + 3] = alpha * c23 + beta * C[2 * ldc + 3];
-
-        C[3 * ldc + 0] = alpha * c30 + beta * C[3 * ldc + 0];
-        C[3 * ldc + 1] = alpha * c31 + beta * C[3 * ldc + 1];
-        C[3 * ldc + 2] = alpha * c32 + beta * C[3 * ldc + 2];
-        C[3 * ldc + 3] = alpha * c33 + beta * C[3 * ldc + 3];
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                C[i * ldc + j] = alpha * c[i][j] + beta * C[i * ldc + j];
+            }
+        }
     }
 }
 
 /*
- * Edge case handlers for non-multiple-of-4 dimensions
+ * Edge case handler for non-multiple-of-4 dimensions
 */
 
-static void gemm_edge_m(int m, int n, int k,
-                        const double* A, int lda,
-                        const double* B, int ldb,
-                        double* C, int ldc,
-                        double alpha, double beta) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            double sum = 0.0;
-            for (int p = 0; p < k; p++) {
-                sum += A[i * lda + p] * B[p * ldb + j];
-            }
-            if (beta == 0.0) {
-                C[i * ldc + j] = alpha * sum;
-            } else {
-                C[i * ldc + j] = alpha * sum + beta * C[i * ldc + j];
-            }
-        }
-    }
-}
-
-static void gemm_edge_n(int m, int n, int k,
-                        const double* A, int lda,
-                        const double* B, int ldb,
-                        double* C, int ldc,
-                        double alpha, double beta) {
+static void gemm_edge(int m, int n, int k,
+                      const double* A, int lda,
+                      const double* B, int ldb,
+                      double* C, int ldc,
+                      double alpha, double beta) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             double sum = 0.0;
@@ -175,33 +141,30 @@ static void gemm_edge_n(int m, int n, int k,
 }
 
 /*
- * Main GEMM implementation
+ * Panel computation with micro-kernel blocking
 */
 
 /**
- * @brief Scalar GEMM implementation with cache blocking
+ * @brief Compute a panel of C using micro-kernel blocking
  *
- * Uses a three-level blocking strategy:
- * 1. Outer blocking for cache efficiency
- * 2. Register blocking with 4x4 micro-kernel
- * 3. Edge case handling for non-aligned dimensions
+ * Computes C_panel = alpha * A_panel * B_panel + beta * C_panel
+ * where panels have dimensions: A (m_panel × k_panel), B (k_panel × n_panel)
  */
-static void gemm_scalar_impl(int m, int n, int k,
-                             double alpha,
-                             const double* A, int lda,
-                             const double* B, int ldb,
-                             double beta,
-                             double* C, int ldc) {
-    /* Process in 4x4 blocks using micro-kernel */
-    int m_blocks = m / GEMM_MR;
-    int n_blocks = n / GEMM_NR;
-    int m_remainder = m % GEMM_MR;
-    int n_remainder = n % GEMM_NR;
+static void gemm_panel(int m_panel, int n_panel, int k_panel,
+                       double alpha,
+                       const double* A, int lda,
+                       const double* B, int ldb,
+                       double beta,
+                       double* C, int ldc) {
+    int m_blocks = m_panel / GEMM_MR;
+    int n_blocks = n_panel / GEMM_NR;
+    int m_remainder = m_panel % GEMM_MR;
+    int n_remainder = n_panel % GEMM_NR;
 
-    /* Main 4x4 blocked region */
+    /* Main micro-kernel blocked region */
     for (int i = 0; i < m_blocks; i++) {
         for (int j = 0; j < n_blocks; j++) {
-            gemm_micro_kernel_4x4(k,
+            gemm_micro_kernel_8x8(k_panel,
                                   A + i * GEMM_MR * lda,
                                   lda,
                                   B + j * GEMM_NR,
@@ -211,42 +174,94 @@ static void gemm_scalar_impl(int m, int n, int k,
                                   alpha, beta);
         }
 
-        /* Right edge (n remainder) */
+        /* Right edge */
         if (n_remainder > 0) {
-            gemm_edge_n(GEMM_MR, n_remainder, k,
-                        A + i * GEMM_MR * lda,
-                        lda,
-                        B + n_blocks * GEMM_NR,
-                        ldb,
-                        C + i * GEMM_MR * ldc + n_blocks * GEMM_NR,
-                        ldc,
-                        alpha, beta);
+            gemm_edge(GEMM_MR, n_remainder, k_panel,
+                      A + i * GEMM_MR * lda,
+                      lda,
+                      B + n_blocks * GEMM_NR,
+                      ldb,
+                      C + i * GEMM_MR * ldc + n_blocks * GEMM_NR,
+                      ldc,
+                      alpha, beta);
         }
     }
 
-    /* Bottom edge (m remainder) */
+    /* Bottom edge */
     if (m_remainder > 0) {
         for (int j = 0; j < n_blocks; j++) {
-            gemm_edge_m(m_remainder, GEMM_NR, k,
-                        A + m_blocks * GEMM_MR * lda,
-                        lda,
-                        B + j * GEMM_NR,
-                        ldb,
-                        C + m_blocks * GEMM_MR * ldc + j * GEMM_NR,
-                        ldc,
-                        alpha, beta);
+            gemm_edge(m_remainder, GEMM_NR, k_panel,
+                      A + m_blocks * GEMM_MR * lda,
+                      lda,
+                      B + j * GEMM_NR,
+                      ldb,
+                      C + m_blocks * GEMM_MR * ldc + j * GEMM_NR,
+                      ldc,
+                      alpha, beta);
         }
 
         /* Bottom-right corner */
         if (n_remainder > 0) {
-            gemm_edge_m(m_remainder, n_remainder, k,
-                        A + m_blocks * GEMM_MR * lda,
-                        lda,
-                        B + n_blocks * GEMM_NR,
-                        ldb,
-                        C + m_blocks * GEMM_MR * ldc + n_blocks * GEMM_NR,
-                        ldc,
-                        alpha, beta);
+            gemm_edge(m_remainder, n_remainder, k_panel,
+                      A + m_blocks * GEMM_MR * lda,
+                      lda,
+                      B + n_blocks * GEMM_NR,
+                      ldb,
+                      C + m_blocks * GEMM_MR * ldc + n_blocks * GEMM_NR,
+                      ldc,
+                      alpha, beta);
+        }
+    }
+}
+
+/*
+ * Main GEMM implementation with three-level cache blocking
+*/
+
+/**
+ * @brief Scalar GEMM implementation with three-level cache blocking
+ *
+ * Blocking strategy (following BLIS/GotoBLAS approach):
+ * 1. NC blocking: Keep B panel in L3 cache
+ * 2. KC blocking: Keep B sub-panel in L2 cache
+ * 3. MC blocking: Keep A sub-panel in L1 cache
+ * 4. MR×NR micro-kernel: Register-level blocking
+ *
+ * Loop structure: for jc, pc, ic (N, K, M order)
+ * This maximizes reuse of B data in cache.
+ */
+static void gemm_scalar_impl(int m, int n, int k,
+                             double alpha,
+                             const double* A, int lda,
+                             const double* B, int ldb,
+                             double beta,
+                             double* C, int ldc) {
+    /* Loop over N dimension (NC blocks) */
+    for (int jc = 0; jc < n; jc += GEMM_NC) {
+        int nc = (jc + GEMM_NC <= n) ? GEMM_NC : (n - jc);
+
+        /* Loop over K dimension (KC blocks) */
+        for (int pc = 0; pc < k; pc += GEMM_KC) {
+            int kc = (pc + GEMM_KC <= k) ? GEMM_KC : (k - pc);
+
+            /* Determine beta for this K iteration */
+            double beta_panel = (pc == 0) ? beta : 1.0;
+
+            /* Loop over M dimension (MC blocks) */
+            for (int ic = 0; ic < m; ic += GEMM_MC) {
+                int mc = (ic + GEMM_MC <= m) ? GEMM_MC : (m - ic);
+
+                /* Compute panel: C[ic:ic+mc, jc:jc+nc] += A[ic:ic+mc, pc:pc+kc] * B[pc:pc+kc, jc:jc+nc] */
+                gemm_panel(mc, nc, kc,
+                          alpha,
+                          A + ic * lda + pc,
+                          lda,
+                          B + pc * ldb + jc,
+                          ldb,
+                          beta_panel,
+                          C + ic * ldc + jc,
+                          ldc);
+            }
         }
     }
 }

@@ -54,7 +54,13 @@ static void gemm_micro_kernel_4x8_avx512(int k,
         __m512d a2_vec = _mm512_set1_pd(a2);
         __m512d a3_vec = _mm512_set1_pd(a3);
 
-        __m512d b = _mm512_loadu_pd(&B[p * ldb]);
+        /* Use aligned load if B row is 64-byte aligned */
+        __m512d b;
+        if (((uintptr_t)&B[p * ldb] & 63) == 0) {
+            b = _mm512_load_pd(&B[p * ldb]);
+        } else {
+            b = _mm512_loadu_pd(&B[p * ldb]);
+        }
 
         c0 = _mm512_fmadd_pd(a0_vec, b, c0);
         c1 = _mm512_fmadd_pd(a1_vec, b, c1);
@@ -69,29 +75,56 @@ static void gemm_micro_kernel_4x8_avx512(int k,
     c3 = _mm512_mul_pd(c3, alpha_vec);
 
     if (beta == 0.0) {
-        _mm512_storeu_pd(&C[0 * ldc], c0);
-        _mm512_storeu_pd(&C[1 * ldc], c1);
-        _mm512_storeu_pd(&C[2 * ldc], c2);
-        _mm512_storeu_pd(&C[3 * ldc], c3);
+        /* Use aligned stores if C is 64-byte aligned */
+        if (((uintptr_t)C & 63) == 0 && (ldc * sizeof(double)) % 64 == 0) {
+            _mm512_store_pd(&C[0 * ldc], c0);
+            _mm512_store_pd(&C[1 * ldc], c1);
+            _mm512_store_pd(&C[2 * ldc], c2);
+            _mm512_store_pd(&C[3 * ldc], c3);
+        } else {
+            _mm512_storeu_pd(&C[0 * ldc], c0);
+            _mm512_storeu_pd(&C[1 * ldc], c1);
+            _mm512_storeu_pd(&C[2 * ldc], c2);
+            _mm512_storeu_pd(&C[3 * ldc], c3);
+        }
     } else {
         __m512d beta_vec = _mm512_set1_pd(beta);
         __m512d c_old;
 
-        c_old = _mm512_loadu_pd(&C[0 * ldc]);
-        c_old = _mm512_fmadd_pd(c_old, beta_vec, c0);
-        _mm512_storeu_pd(&C[0 * ldc], c_old);
+        /* Use aligned loads/stores if C is 64-byte aligned */
+        if (((uintptr_t)C & 63) == 0 && (ldc * sizeof(double)) % 64 == 0) {
+            c_old = _mm512_load_pd(&C[0 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c0);
+            _mm512_store_pd(&C[0 * ldc], c_old);
 
-        c_old = _mm512_loadu_pd(&C[1 * ldc]);
-        c_old = _mm512_fmadd_pd(c_old, beta_vec, c1);
-        _mm512_storeu_pd(&C[1 * ldc], c_old);
+            c_old = _mm512_load_pd(&C[1 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c1);
+            _mm512_store_pd(&C[1 * ldc], c_old);
 
-        c_old = _mm512_loadu_pd(&C[2 * ldc]);
-        c_old = _mm512_fmadd_pd(c_old, beta_vec, c2);
-        _mm512_storeu_pd(&C[2 * ldc], c_old);
+            c_old = _mm512_load_pd(&C[2 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c2);
+            _mm512_store_pd(&C[2 * ldc], c_old);
 
-        c_old = _mm512_loadu_pd(&C[3 * ldc]);
-        c_old = _mm512_fmadd_pd(c_old, beta_vec, c3);
-        _mm512_storeu_pd(&C[3 * ldc], c_old);
+            c_old = _mm512_load_pd(&C[3 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c3);
+            _mm512_store_pd(&C[3 * ldc], c_old);
+        } else {
+            c_old = _mm512_loadu_pd(&C[0 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c0);
+            _mm512_storeu_pd(&C[0 * ldc], c_old);
+
+            c_old = _mm512_loadu_pd(&C[1 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c1);
+            _mm512_storeu_pd(&C[1 * ldc], c_old);
+
+            c_old = _mm512_loadu_pd(&C[2 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c2);
+            _mm512_storeu_pd(&C[2 * ldc], c_old);
+
+            c_old = _mm512_loadu_pd(&C[3 * ldc]);
+            c_old = _mm512_fmadd_pd(beta_vec, c_old, c3);
+            _mm512_storeu_pd(&C[3 * ldc], c_old);
+        }
     }
 }
 

@@ -59,8 +59,16 @@ static void gemm_micro_kernel_4x8_avx2(int k,
         __m256d a2_vec = _mm256_set1_pd(a2);
         __m256d a3_vec = _mm256_set1_pd(a3);
 
-        __m256d b03 = _mm256_loadu_pd(&B[p * ldb + 0]);
-        __m256d b47 = _mm256_loadu_pd(&B[p * ldb + 4]);
+        /* Use aligned loads if B is 32-byte aligned, otherwise unaligned */
+        const double* b_ptr = &B[p * ldb];
+        __m256d b03, b47;
+        if (((uintptr_t)b_ptr & 31) == 0) {
+            b03 = _mm256_load_pd(b_ptr + 0);
+            b47 = _mm256_load_pd(b_ptr + 4);
+        } else {
+            b03 = _mm256_loadu_pd(b_ptr + 0);
+            b47 = _mm256_loadu_pd(b_ptr + 4);
+        }
 
         c00_03 = _mm256_fmadd_pd(a0_vec, b03, c00_03);
         c04_07 = _mm256_fmadd_pd(a0_vec, b47, c04_07);
@@ -86,49 +94,96 @@ static void gemm_micro_kernel_4x8_avx2(int k,
     c34_37 = _mm256_mul_pd(c34_37, alpha_vec);
 
     if (beta == 0.0) {
-        _mm256_storeu_pd(&C[0 * ldc + 0], c00_03);
-        _mm256_storeu_pd(&C[0 * ldc + 4], c04_07);
-        _mm256_storeu_pd(&C[1 * ldc + 0], c10_13);
-        _mm256_storeu_pd(&C[1 * ldc + 4], c14_17);
-        _mm256_storeu_pd(&C[2 * ldc + 0], c20_23);
-        _mm256_storeu_pd(&C[2 * ldc + 4], c24_27);
-        _mm256_storeu_pd(&C[3 * ldc + 0], c30_33);
-        _mm256_storeu_pd(&C[3 * ldc + 4], c34_37);
+        /* Use aligned stores if C is 32-byte aligned */
+        if (((uintptr_t)C & 31) == 0 && (ldc * sizeof(double)) % 32 == 0) {
+            _mm256_store_pd(&C[0 * ldc + 0], c00_03);
+            _mm256_store_pd(&C[0 * ldc + 4], c04_07);
+            _mm256_store_pd(&C[1 * ldc + 0], c10_13);
+            _mm256_store_pd(&C[1 * ldc + 4], c14_17);
+            _mm256_store_pd(&C[2 * ldc + 0], c20_23);
+            _mm256_store_pd(&C[2 * ldc + 4], c24_27);
+            _mm256_store_pd(&C[3 * ldc + 0], c30_33);
+            _mm256_store_pd(&C[3 * ldc + 4], c34_37);
+        } else {
+            _mm256_storeu_pd(&C[0 * ldc + 0], c00_03);
+            _mm256_storeu_pd(&C[0 * ldc + 4], c04_07);
+            _mm256_storeu_pd(&C[1 * ldc + 0], c10_13);
+            _mm256_storeu_pd(&C[1 * ldc + 4], c14_17);
+            _mm256_storeu_pd(&C[2 * ldc + 0], c20_23);
+            _mm256_storeu_pd(&C[2 * ldc + 4], c24_27);
+            _mm256_storeu_pd(&C[3 * ldc + 0], c30_33);
+            _mm256_storeu_pd(&C[3 * ldc + 4], c34_37);
+        }
     } else {
         __m256d beta_vec = _mm256_set1_pd(beta);
         __m256d c_old;
 
-        c_old = _mm256_loadu_pd(&C[0 * ldc + 0]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c00_03);
-        _mm256_storeu_pd(&C[0 * ldc + 0], c_old);
+        /* Use aligned loads/stores if C is 32-byte aligned */
+        if (((uintptr_t)C & 31) == 0 && (ldc * sizeof(double)) % 32 == 0) {
+            c_old = _mm256_load_pd(&C[0 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c00_03);
+            _mm256_store_pd(&C[0 * ldc + 0], c_old);
 
-        c_old = _mm256_loadu_pd(&C[0 * ldc + 4]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c04_07);
-        _mm256_storeu_pd(&C[0 * ldc + 4], c_old);
+            c_old = _mm256_load_pd(&C[0 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c04_07);
+            _mm256_store_pd(&C[0 * ldc + 4], c_old);
 
-        c_old = _mm256_loadu_pd(&C[1 * ldc + 0]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c10_13);
-        _mm256_storeu_pd(&C[1 * ldc + 0], c_old);
+            c_old = _mm256_load_pd(&C[1 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c10_13);
+            _mm256_store_pd(&C[1 * ldc + 0], c_old);
 
-        c_old = _mm256_loadu_pd(&C[1 * ldc + 4]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c14_17);
-        _mm256_storeu_pd(&C[1 * ldc + 4], c_old);
+            c_old = _mm256_load_pd(&C[1 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c14_17);
+            _mm256_store_pd(&C[1 * ldc + 4], c_old);
 
-        c_old = _mm256_loadu_pd(&C[2 * ldc + 0]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c20_23);
-        _mm256_storeu_pd(&C[2 * ldc + 0], c_old);
+            c_old = _mm256_load_pd(&C[2 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c20_23);
+            _mm256_store_pd(&C[2 * ldc + 0], c_old);
 
-        c_old = _mm256_loadu_pd(&C[2 * ldc + 4]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c24_27);
-        _mm256_storeu_pd(&C[2 * ldc + 4], c_old);
+            c_old = _mm256_load_pd(&C[2 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c24_27);
+            _mm256_store_pd(&C[2 * ldc + 4], c_old);
 
-        c_old = _mm256_loadu_pd(&C[3 * ldc + 0]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c30_33);
-        _mm256_storeu_pd(&C[3 * ldc + 0], c_old);
+            c_old = _mm256_load_pd(&C[3 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c30_33);
+            _mm256_store_pd(&C[3 * ldc + 0], c_old);
 
-        c_old = _mm256_loadu_pd(&C[3 * ldc + 4]);
-        c_old = _mm256_fmadd_pd(c_old, beta_vec, c34_37);
-        _mm256_storeu_pd(&C[3 * ldc + 4], c_old);
+            c_old = _mm256_load_pd(&C[3 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c34_37);
+            _mm256_store_pd(&C[3 * ldc + 4], c_old);
+        } else {
+            c_old = _mm256_loadu_pd(&C[0 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c00_03);
+            _mm256_storeu_pd(&C[0 * ldc + 0], c_old);
+
+            c_old = _mm256_loadu_pd(&C[0 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c04_07);
+            _mm256_storeu_pd(&C[0 * ldc + 4], c_old);
+
+            c_old = _mm256_loadu_pd(&C[1 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c10_13);
+            _mm256_storeu_pd(&C[1 * ldc + 0], c_old);
+
+            c_old = _mm256_loadu_pd(&C[1 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c14_17);
+            _mm256_storeu_pd(&C[1 * ldc + 4], c_old);
+
+            c_old = _mm256_loadu_pd(&C[2 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c20_23);
+            _mm256_storeu_pd(&C[2 * ldc + 0], c_old);
+
+            c_old = _mm256_loadu_pd(&C[2 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c24_27);
+            _mm256_storeu_pd(&C[2 * ldc + 4], c_old);
+
+            c_old = _mm256_loadu_pd(&C[3 * ldc + 0]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c30_33);
+            _mm256_storeu_pd(&C[3 * ldc + 0], c_old);
+
+            c_old = _mm256_loadu_pd(&C[3 * ldc + 4]);
+            c_old = _mm256_fmadd_pd(beta_vec, c_old, c34_37);
+            _mm256_storeu_pd(&C[3 * ldc + 4], c_old);
+        }
     }
 }
 

@@ -5,7 +5,11 @@
  * Implements: y = alpha * A * x + beta * y
  * where A is m×n, x is n×1, y is m×1
  *
- * Provides SIMD-optimized implementations for different CPU capabilities.
+ * Provides SIMD-optimized implementations with cache blocking for different CPU capabilities.
+ *
+ * Cache blocking strategy:
+ * - KC (column block): 512 elements (~4KB, fits in L1 cache)
+ * - MC (row block): 64 rows (MC×KC block ~32KB, fits in L2 cache)
  */
 
 #include <string.h>
@@ -15,6 +19,10 @@
 #include <fin-kit/platform/error.h>
 #include <fin-kit/platform/simd_detect.h>
 #include <fin-kit/matrix/matrix_internal.h>
+
+/* Cache blocking parameters */
+#define GEMV_KC 512  /* Column block size (L1 cache) */
+#define GEMV_MC 64   /* Row block size (L2 cache) */
 
 #if FC_HAS_AVX2
 #include <immintrin.h>
@@ -30,37 +38,61 @@ fc_mat_gemv_f64_avx2(int m, int n,
                      const double* x,
                      double beta,
                      double* y) {
-    for (int i = 0; i < m; i++) {
-        __m256d sum_vec = _mm256_setzero_pd();
-        int j = 0;
-
-        for (; j + 3 < n; j += 4) {
-            __m256d a_vec = _mm256_loadu_pd(&A[i * lda + j]);
-            __m256d x_vec = _mm256_loadu_pd(&x[j]);
-            sum_vec = _mm256_fmadd_pd(a_vec, x_vec, sum_vec);
+    /* Apply beta scaling first if needed */
+    if (beta == 0.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] = 0.0;
         }
-
-        /* Pairwise horizontal reduction for better precision */
-        __m128d lo = _mm256_castpd256_pd128(sum_vec);
-        __m128d hi = _mm256_extractf128_pd(sum_vec, 1);
-        __m128d pair = _mm_add_pd(lo, hi);
-        double sum = _mm_cvtsd_f64(pair) +
-                     _mm_cvtsd_f64(_mm_unpackhi_pd(pair, pair));
-
-        /* Scalar tail with Kahan compensation */
-        double c = 0.0;
-        for (; j < n; j++) {
-            double product = A[i * lda + j] * x[j];
-            double t = product - c;
-            double s = sum + t;
-            c = (s - sum) - t;
-            sum = s;
+    } else if (beta != 1.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] *= beta;
         }
+    }
 
-        if (beta == 0.0) {
-            y[i] = alpha * sum;
-        } else {
-            y[i] = alpha * sum + beta * y[i];
+    /* Cache-blocked computation: outer loop over column blocks */
+    for (int jc = 0; jc < n; jc += GEMV_KC) {
+        int nc = (jc + GEMV_KC <= n) ? GEMV_KC : (n - jc);
+
+        /* Inner loop over row blocks */
+        for (int ic = 0; ic < m; ic += GEMV_MC) {
+            int mc = (ic + GEMV_MC <= m) ? GEMV_MC : (m - ic);
+
+            /* Process MC×KC block */
+            for (int i = ic; i < ic + mc; i++) {
+                __m256d sum_vec = _mm256_setzero_pd();
+                int j = jc;
+
+                /* Check alignment for this row */
+                int is_aligned = (((uintptr_t)&A[i * lda + jc] & 31) == 0);
+
+                /* SIMD loop */
+                for (; j + 3 < jc + nc; j += 4) {
+                    __m256d a_vec, x_vec;
+                    if (is_aligned && ((uintptr_t)&x[j] & 31) == 0) {
+                        a_vec = _mm256_load_pd(&A[i * lda + j]);
+                        x_vec = _mm256_load_pd(&x[j]);
+                    } else {
+                        a_vec = _mm256_loadu_pd(&A[i * lda + j]);
+                        x_vec = _mm256_loadu_pd(&x[j]);
+                    }
+                    sum_vec = _mm256_fmadd_pd(a_vec, x_vec, sum_vec);
+                }
+
+                /* Horizontal reduction */
+                __m128d lo = _mm256_castpd256_pd128(sum_vec);
+                __m128d hi = _mm256_extractf128_pd(sum_vec, 1);
+                __m128d pair = _mm_add_pd(lo, hi);
+                double sum = _mm_cvtsd_f64(pair) +
+                            _mm_cvtsd_f64(_mm_unpackhi_pd(pair, pair));
+
+                /* Scalar tail */
+                for (; j < jc + nc; j++) {
+                    sum += A[i * lda + j] * x[j];
+                }
+
+                /* Accumulate to output */
+                y[i] += alpha * sum;
+            }
         }
     }
 }
@@ -82,33 +114,58 @@ fc_mat_gemv_f64_sse42(int m, int n,
                       const double* x,
                       double beta,
                       double* y) {
-    for (int i = 0; i < m; i++) {
-        __m128d sum_vec = _mm_setzero_pd();
-        int j = 0;
-
-        for (; j + 1 < n; j += 2) {
-            __m128d a_vec = _mm_loadu_pd(&A[i * lda + j]);
-            __m128d x_vec = _mm_loadu_pd(&x[j]);
-            sum_vec = _mm_add_pd(sum_vec, _mm_mul_pd(a_vec, x_vec));
+    /* Apply beta scaling first if needed */
+    if (beta == 0.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] = 0.0;
         }
-
-        double sum = _mm_cvtsd_f64(sum_vec) +
-                     _mm_cvtsd_f64(_mm_unpackhi_pd(sum_vec, sum_vec));
-
-        /* Scalar tail with Kahan compensation */
-        double c = 0.0;
-        for (; j < n; j++) {
-            double product = A[i * lda + j] * x[j];
-            double t = product - c;
-            double s = sum + t;
-            c = (s - sum) - t;
-            sum = s;
+    } else if (beta != 1.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] *= beta;
         }
+    }
 
-        if (beta == 0.0) {
-            y[i] = alpha * sum;
-        } else {
-            y[i] = alpha * sum + beta * y[i];
+    /* Cache-blocked computation: outer loop over column blocks */
+    for (int jc = 0; jc < n; jc += GEMV_KC) {
+        int nc = (jc + GEMV_KC <= n) ? GEMV_KC : (n - jc);
+
+        /* Inner loop over row blocks */
+        for (int ic = 0; ic < m; ic += GEMV_MC) {
+            int mc = (ic + GEMV_MC <= m) ? GEMV_MC : (m - ic);
+
+            /* Process MC×KC block */
+            for (int i = ic; i < ic + mc; i++) {
+                __m128d sum_vec = _mm_setzero_pd();
+                int j = jc;
+
+                /* Check alignment for this row */
+                int is_aligned = (((uintptr_t)&A[i * lda + jc] & 15) == 0);
+
+                /* SIMD loop */
+                for (; j + 1 < jc + nc; j += 2) {
+                    __m128d a_vec, x_vec;
+                    if (is_aligned && ((uintptr_t)&x[j] & 15) == 0) {
+                        a_vec = _mm_load_pd(&A[i * lda + j]);
+                        x_vec = _mm_load_pd(&x[j]);
+                    } else {
+                        a_vec = _mm_loadu_pd(&A[i * lda + j]);
+                        x_vec = _mm_loadu_pd(&x[j]);
+                    }
+                    sum_vec = _mm_add_pd(sum_vec, _mm_mul_pd(a_vec, x_vec));
+                }
+
+                /* Horizontal reduction */
+                double sum = _mm_cvtsd_f64(sum_vec) +
+                            _mm_cvtsd_f64(_mm_unpackhi_pd(sum_vec, sum_vec));
+
+                /* Scalar tail */
+                for (; j < jc + nc; j++) {
+                    sum += A[i * lda + j] * x[j];
+                }
+
+                /* Accumulate to output */
+                y[i] += alpha * sum;
+            }
         }
     }
 }
@@ -126,22 +183,34 @@ fc_mat_gemv_f64_scalar(int m, int n,
                        const double* x,
                        double beta,
                        double* y) {
-    for (int i = 0; i < m; i++) {
-        /* Kahan summation for numerical stability */
-        double sum = 0.0;
-        double c = 0.0;
-        for (int j = 0; j < n; j++) {
-            double product = A[i * lda + j] * x[j];
-            double t = product - c;
-            double s = sum + t;
-            c = (s - sum) - t;
-            sum = s;
+    /* Apply beta scaling first if needed */
+    if (beta == 0.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] = 0.0;
         }
+    } else if (beta != 1.0) {
+        for (int i = 0; i < m; i++) {
+            y[i] *= beta;
+        }
+    }
 
-        if (beta == 0.0) {
-            y[i] = alpha * sum;
-        } else {
-            y[i] = alpha * sum + beta * y[i];
+    /* Cache-blocked computation: outer loop over column blocks */
+    for (int jc = 0; jc < n; jc += GEMV_KC) {
+        int nc = (jc + GEMV_KC <= n) ? GEMV_KC : (n - jc);
+
+        /* Inner loop over row blocks */
+        for (int ic = 0; ic < m; ic += GEMV_MC) {
+            int mc = (ic + GEMV_MC <= m) ? GEMV_MC : (m - ic);
+
+            /* Process MC×KC block */
+            for (int i = ic; i < ic + mc; i++) {
+                double sum = 0.0;
+                for (int j = jc; j < jc + nc; j++) {
+                    sum += A[i * lda + j] * x[j];
+                }
+                /* Accumulate to output */
+                y[i] += alpha * sum;
+            }
         }
     }
 }
