@@ -20,7 +20,14 @@ int fc_init(void) {
     }
 
     /* Detect SIMD capabilities */
-    fc_detect_simd();
+    fc_simd_level_t level = fc_detect_simd();
+
+    /* Validate detection result */
+    if (level < FC_SIMD_SCALAR || level > FC_SIMD_NEON) {
+        /* Invalid SIMD level detected, rollback initialization */
+        atomic_store(&g_fc_initialized, 0);
+        return FC_ERR_ILLEGAL_STATE;
+    }
 
     return FC_OK;
 }

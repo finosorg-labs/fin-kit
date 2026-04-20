@@ -93,7 +93,17 @@ static void gemm_micro_kernel_4x8_avx2(int k,
     c30_33 = _mm256_mul_pd(c30_33, alpha_vec);
     c34_37 = _mm256_mul_pd(c34_37, alpha_vec);
 
-    if (beta == 0.0) {
+    if (beta == 1.0) {
+        /* Fast path: C += alpha*A*B (most common in blocked GEMM) */
+        _mm256_storeu_pd(&C[0 * ldc + 0], _mm256_add_pd(_mm256_loadu_pd(&C[0 * ldc + 0]), c00_03));
+        _mm256_storeu_pd(&C[0 * ldc + 4], _mm256_add_pd(_mm256_loadu_pd(&C[0 * ldc + 4]), c04_07));
+        _mm256_storeu_pd(&C[1 * ldc + 0], _mm256_add_pd(_mm256_loadu_pd(&C[1 * ldc + 0]), c10_13));
+        _mm256_storeu_pd(&C[1 * ldc + 4], _mm256_add_pd(_mm256_loadu_pd(&C[1 * ldc + 4]), c14_17));
+        _mm256_storeu_pd(&C[2 * ldc + 0], _mm256_add_pd(_mm256_loadu_pd(&C[2 * ldc + 0]), c20_23));
+        _mm256_storeu_pd(&C[2 * ldc + 4], _mm256_add_pd(_mm256_loadu_pd(&C[2 * ldc + 4]), c24_27));
+        _mm256_storeu_pd(&C[3 * ldc + 0], _mm256_add_pd(_mm256_loadu_pd(&C[3 * ldc + 0]), c30_33));
+        _mm256_storeu_pd(&C[3 * ldc + 4], _mm256_add_pd(_mm256_loadu_pd(&C[3 * ldc + 4]), c34_37));
+    } else if (beta == 0.0) {
         /* Use aligned stores if C is 32-byte aligned */
         if (((uintptr_t)C & 31) == 0 && (ldc * sizeof(double)) % 32 == 0) {
             _mm256_store_pd(&C[0 * ldc + 0], c00_03);
@@ -225,44 +235,65 @@ int fc_mat_gemm_f64_avx2(int m, int n, int k,
 
     const int MR = 4;
     const int NR = 8;
-    int m_blocks = m / MR;
-    int n_blocks = n / NR;
-    int m_remainder = m % MR;
-    int n_remainder = n % NR;
 
-    for (int i = 0; i < m_blocks; i++) {
-        for (int j = 0; j < n_blocks; j++) {
-            gemm_micro_kernel_4x8_avx2(k,
-                                       A + i * MR * lda,
+    /* Cache blocking parameters (tuned for L2 cache ~256KB) */
+    const int MC = 64;   /* M dimension block */
+    const int KC = 256;  /* K dimension block */
+    const int NC = 512;  /* N dimension block */
+
+    /* Three-level blocked GEMM: NC -> KC -> MC */
+    for (int jc = 0; jc < n; jc += NC) {
+        int nc = (jc + NC <= n) ? NC : (n - jc);
+
+        for (int pc = 0; pc < k; pc += KC) {
+            int kc = (pc + KC <= k) ? KC : (k - pc);
+            double beta_block = (pc == 0) ? beta : 1.0;
+
+            for (int ic = 0; ic < m; ic += MC) {
+                int mc = (ic + MC <= m) ? MC : (m - ic);
+
+                /* Process MC×KC×NC block */
+                int m_blocks = mc / MR;
+                int n_blocks = nc / NR;
+                int m_remainder = mc % MR;
+                int n_remainder = nc % NR;
+
+                for (int i = 0; i < m_blocks; i++) {
+                    for (int j = 0; j < n_blocks; j++) {
+                        gemm_micro_kernel_4x8_avx2(kc,
+                                                   A + (ic + i * MR) * lda + pc,
+                                                   lda,
+                                                   B + pc * ldb + (jc + j * NR),
+                                                   ldb,
+                                                   C + (ic + i * MR) * ldc + (jc + j * NR),
+                                                   ldc,
+                                                   alpha, beta_block);
+                    }
+
+                    if (n_remainder > 0) {
+                        gemm_edge_avx2(MR, n_remainder, kc,
+                                       A + (ic + i * MR) * lda + pc,
                                        lda,
-                                       B + j * NR,
+                                       B + pc * ldb + (jc + n_blocks * NR),
                                        ldb,
-                                       C + i * MR * ldc + j * NR,
+                                       C + (ic + i * MR) * ldc + (jc + n_blocks * NR),
                                        ldc,
-                                       alpha, beta);
-        }
+                                       alpha, beta_block);
+                    }
+                }
 
-        if (n_remainder > 0) {
-            gemm_edge_avx2(MR, n_remainder, k,
-                           A + i * MR * lda,
-                           lda,
-                           B + n_blocks * NR,
-                           ldb,
-                           C + i * MR * ldc + n_blocks * NR,
-                           ldc,
-                           alpha, beta);
+                if (m_remainder > 0) {
+                    gemm_edge_avx2(m_remainder, nc, kc,
+                                   A + (ic + m_blocks * MR) * lda + pc,
+                                   lda,
+                                   B + pc * ldb + jc,
+                                   ldb,
+                                   C + (ic + m_blocks * MR) * ldc + jc,
+                                   ldc,
+                                   alpha, beta_block);
+                }
+            }
         }
-    }
-
-    if (m_remainder > 0) {
-        gemm_edge_avx2(m_remainder, n, k,
-                       A + m_blocks * MR * lda,
-                       lda,
-                       B,
-                       ldb,
-                       C + m_blocks * MR * ldc,
-                       ldc,
-                       alpha, beta);
     }
 
     return FC_OK;

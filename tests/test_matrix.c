@@ -603,6 +603,128 @@ TEST(test_gemm_sse42_direct) {
 }
 
 /*
+ * GEMM precision validation tests
+*/
+
+TEST(test_gemm_precision_64x64) {
+    /* Test GEMM precision on 64x64 matrices against reference implementation */
+    const int m = 64, n = 64, k = 64;
+    double* A = (double*)malloc(m * k * sizeof(double));
+    double* B = (double*)malloc(k * n * sizeof(double));
+    double* C = (double*)malloc(m * n * sizeof(double));
+    double* C_ref = (double*)malloc(m * n * sizeof(double));
+
+    /* Initialize with random values */
+    srand(12345);
+    fill_random_matrix(A, m, k, k, -10.0, 10.0);
+    fill_random_matrix(B, k, n, n, -10.0, 10.0);
+    memset(C, 0, m * n * sizeof(double));
+    memset(C_ref, 0, m * n * sizeof(double));
+
+    /* Compute with optimized GEMM */
+    int status = fc_mat_gemm_f64(m, n, k, 1.0, A, k, B, n, 0.0, C, n);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Compute reference result */
+    gemm_reference(m, n, k, 1.0, A, k, B, n, 0.0, C_ref, n);
+
+    /* Verify precision: relative error should be < 1e-12 */
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            double diff = fabs(C[i * n + j] - C_ref[i * n + j]);
+            double magnitude = fabs(C_ref[i * n + j]);
+            double rel_error = (magnitude > 1e-15) ? (diff / magnitude) : diff;
+            if (rel_error >= 1e-12) {
+                printf("Precision error at [%d,%d]: got %.17g, expected %.17g, rel_error=%.3e\n",
+                       i, j, C[i * n + j], C_ref[i * n + j], rel_error);
+            }
+            ASSERT_TRUE(rel_error < 1e-12);
+        }
+    }
+
+    free(A);
+    free(B);
+    free(C);
+    free(C_ref);
+}
+
+TEST(test_gemm_precision_128x128) {
+    /* Test GEMM precision on larger 128x128 matrices */
+    const int m = 128, n = 128, k = 128;
+    double* A = (double*)malloc(m * k * sizeof(double));
+    double* B = (double*)malloc(k * n * sizeof(double));
+    double* C = (double*)malloc(m * n * sizeof(double));
+    double* C_ref = (double*)malloc(m * n * sizeof(double));
+
+    /* Initialize with random values */
+    srand(54321);
+    fill_random_matrix(A, m, k, k, -5.0, 5.0);
+    fill_random_matrix(B, k, n, n, -5.0, 5.0);
+    memset(C, 0, m * n * sizeof(double));
+    memset(C_ref, 0, m * n * sizeof(double));
+
+    /* Compute with optimized GEMM */
+    int status = fc_mat_gemm_f64(m, n, k, 1.0, A, k, B, n, 0.0, C, n);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Compute reference result */
+    gemm_reference(m, n, k, 1.0, A, k, B, n, 0.0, C_ref, n);
+
+    /* Verify precision */
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            double diff = fabs(C[i * n + j] - C_ref[i * n + j]);
+            double magnitude = fabs(C_ref[i * n + j]);
+            double rel_error = (magnitude > 1e-15) ? (diff / magnitude) : diff;
+            ASSERT_TRUE(rel_error < 1e-10);
+        }
+    }
+
+    free(A);
+    free(B);
+    free(C);
+    free(C_ref);
+}
+
+TEST(test_gemm_precision_large_values) {
+    /* Test GEMM precision with large values to check numerical stability */
+    const int m = 32, n = 32, k = 32;
+    double* A = (double*)malloc(m * k * sizeof(double));
+    double* B = (double*)malloc(k * n * sizeof(double));
+    double* C = (double*)malloc(m * n * sizeof(double));
+    double* C_ref = (double*)malloc(m * n * sizeof(double));
+
+    /* Initialize with larger values */
+    srand(99999);
+    fill_random_matrix(A, m, k, k, -1000.0, 1000.0);
+    fill_random_matrix(B, k, n, n, -1000.0, 1000.0);
+    memset(C, 0, m * n * sizeof(double));
+    memset(C_ref, 0, m * n * sizeof(double));
+
+    /* Compute with optimized GEMM */
+    int status = fc_mat_gemm_f64(m, n, k, 1.0, A, k, B, n, 0.0, C, n);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Compute reference result */
+    gemm_reference(m, n, k, 1.0, A, k, B, n, 0.0, C_ref, n);
+
+    /* Verify precision with slightly relaxed tolerance for large values */
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            double diff = fabs(C[i * n + j] - C_ref[i * n + j]);
+            double magnitude = fabs(C_ref[i * n + j]);
+            double rel_error = (magnitude > 1e-10) ? (diff / magnitude) : diff;
+            ASSERT_TRUE(rel_error < 1e-10);
+        }
+    }
+
+    free(A);
+    free(B);
+    free(C);
+    free(C_ref);
+}
+
+/*
  * Test suite registration
 */
 
@@ -1897,4 +2019,9 @@ void register_matrix_tests(void) {
     RUN_TEST(test_gemm_random_rectangular);
     RUN_TEST(test_gemv_random);
     RUN_TEST(test_transpose_random);
+
+    /* GEMM precision validation tests */
+    RUN_TEST(test_gemm_precision_64x64);
+    RUN_TEST(test_gemm_precision_128x128);
+    RUN_TEST(test_gemm_precision_large_values);
 }
