@@ -539,7 +539,8 @@ TEST(test_gemm_scalar_direct) {
 TEST(test_gemm_scalar_edge_cases) {
     /* Test scalar implementation with non-aligned dimensions */
     double A[15] = {1,2,3,4,5, 6,7,8,9,10, 11,12,13,14,15};
-    double B[21] = {1,2,3,4,5,6,7, 8,9,10,11,12,13,14, 15,16,17,18,19,20,21};
+    double B[35] = {1,2,3,4,5,6,7, 8,9,10,11,12,13,14, 15,16,17,18,19,20,21,
+                    22,23,24,25,26,27,28, 29,30,31,32,33,34,35};
     double C[12] = {0};
 
     int status = fc_mat_gemm_f64_scalar(3, 4, 5, 1.0, A, 5, B, 7, 0.0, C, 4);
@@ -1308,13 +1309,61 @@ TEST(test_gemm_avx2_with_beta_4x8) {
     for (int i = 0; i < k * n; i++) B[i] = 1.0;
     for (int i = 0; i < m * n; i++) C[i] = 2.0;
 
-    int status = fc_mat_gemm_f64_avx2(m, n, k, 1.0, A, k, B, n, 2.0, C, n);
+    int status = fc_mat_gemm_f64_avx2(m, n, k, 1.0, A, k, B, n, 0.5, C, n);
     ASSERT_EQ(status, FC_OK);
 
-    /* C = 1.0 * A*B + 2.0 * C_old = k + 2*2 = 8 */
+    /* C = 1.0 * A*B + 0.5 * C_old = k + 0.5*2 = 5 */
     for (int i = 0; i < m * n; i++) {
-        ASSERT_TRUE(double_equals(C[i], (double)k + 4.0, TEST_EPSILON));
+        ASSERT_TRUE(double_equals(C[i], (double)k + 1.0, TEST_EPSILON));
     }
+}
+
+TEST(test_gemm_avx2_with_beta_1) {
+    /* Test AVX2 with m=4, n=8, beta=1.0 to cover beta==1.0 fast path */
+    const int m = 4, n = 8, k = 4;
+    double A[16], B[32], C[32];
+
+    for (int i = 0; i < m * k; i++) A[i] = 1.0;
+    for (int i = 0; i < k * n; i++) B[i] = 1.0;
+    for (int i = 0; i < m * n; i++) C[i] = 2.0;
+
+    int status = fc_mat_gemm_f64_avx2(m, n, k, 1.0, A, k, B, n, 1.0, C, n);
+    ASSERT_EQ(status, FC_OK);
+
+    /* C = 1.0 * A*B + 1.0 * C_old = k + 2 = 6 */
+    for (int i = 0; i < m * n; i++) {
+        ASSERT_TRUE(double_equals(C[i], (double)k + 2.0, TEST_EPSILON));
+    }
+}
+
+TEST(test_gemm_sse42_k16) {
+    /* Test SSE4.2 with k=16 to trigger prefetch */
+    const int m = 4, n = 4, k = 16;
+    double A[64], B[64], C[16];
+
+    for (int i = 0; i < m * k; i++) A[i] = 1.0;
+    for (int i = 0; i < k * n; i++) B[i] = 1.0;
+    for (int i = 0; i < m * n; i++) C[i] = 0.0;
+
+    int status = fc_mat_gemm_f64_sse42(m, n, k, 1.0, A, k, B, n, 0.0, C, n);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(C[0], (double)k, TEST_EPSILON));
+}
+
+TEST(test_transpose_large) {
+    /* Test large matrix to trigger blocked transpose */
+    const int rows = 128, cols = 128;
+    double src[16384], dst[16384];
+
+    for (int i = 0; i < rows * cols; i++) src[i] = (double)i;
+
+    int status = fc_mat_transpose_f64(rows, cols, src, cols, dst, rows);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Verify a few elements */
+    ASSERT_TRUE(double_equals(dst[0], 0.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(dst[1], (double)cols, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(dst[rows], 1.0, TEST_EPSILON));
 }
 
 TEST(test_gemm_avx2_n_remainder) {
@@ -1888,6 +1937,212 @@ TEST(test_transpose_random) {
     ASSERT_TRUE(matrices_equal(dst, dst_ref, cols, rows, rows, rows, TEST_EPSILON));
 }
 
+TEST(test_vec_dot_size3) {
+    double x[] = {1.0, 2.0, 3.0};
+    double y[] = {4.0, 5.0, 6.0};
+    double result;
+
+    int status = fc_vec_dot_f64(x, y, 3, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 32.0, TEST_EPSILON));
+}
+
+TEST(test_vec_dot_size5) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    double y[] = {1.0, 1.0, 1.0, 1.0, 1.0};
+    double result;
+
+    int status = fc_vec_dot_f64(x, y, 5, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 15.0, TEST_EPSILON));
+}
+
+TEST(test_vec_dot_size7) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
+    double y[] = {7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
+    double result;
+
+    int status = fc_vec_dot_f64(x, y, 7, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 84.0, TEST_EPSILON));
+}
+
+TEST(test_vec_dot_size9) {
+    double x[9] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+    double y[9] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    double result;
+
+    int status = fc_vec_dot_f64(x, y, 9, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 45.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l2_size3) {
+    double x[] = {1.0, 2.0, 2.0};
+    double result;
+
+    int status = fc_vec_norm_l2_f64(x, 3, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 3.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l2_size5) {
+    double x[] = {1.0, 2.0, 2.0, 0.0, 0.0};
+    double result;
+
+    int status = fc_vec_norm_l2_f64(x, 5, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 3.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l2_size7) {
+    double x[] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    double result;
+
+    int status = fc_vec_norm_l2_f64(x, 7, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, sqrt(7.0), TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l1_size3) {
+    double x[] = {1.0, -2.0, 3.0};
+    double result;
+
+    int status = fc_vec_norm_l1_f64(x, 3, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 6.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l1_size5) {
+    double x[] = {1.0, -2.0, 3.0, -4.0, 5.0};
+    double result;
+
+    int status = fc_vec_norm_l1_f64(x, 5, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 15.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l1_size7) {
+    double x[] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    double result;
+
+    int status = fc_vec_norm_l1_f64(x, 7, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 7.0, TEST_EPSILON));
+}
+
+TEST(test_vec_norm_l1_large_values) {
+    double x[] = {1e100, 2e100, 3e100, 4e100};
+    double result;
+
+    int status = fc_vec_norm_l1_f64(x, 4, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(result > 9.9e100 && result < 10.1e100);
+}
+
+TEST(test_vec_distance_l2_size5) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    double y[] = {5.0, 4.0, 3.0, 2.0, 1.0};
+    double result;
+
+    int status = fc_vec_distance_l2_f64(x, y, 5, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(result > 6.3 && result < 6.4);
+}
+
+TEST(test_vec_distance_l2_size7) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
+    double y[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0};
+    double result;
+
+    int status = fc_vec_distance_l2_f64(x, y, 7, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 1.0, TEST_EPSILON));
+}
+
+TEST(test_vec_distance_l1_size5) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    double y[] = {5.0, 4.0, 3.0, 2.0, 1.0};
+    double result;
+
+    int status = fc_vec_distance_l1_f64(x, y, 5, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 12.0, TEST_EPSILON));
+}
+
+TEST(test_vec_distance_l1_size7) {
+    double x[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
+    double y[] = {7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
+    double result;
+
+    int status = fc_vec_distance_l1_f64(x, y, 7, &result);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(double_equals(result, 24.0, TEST_EPSILON));
+}
+
+TEST(test_gemm_scalar_8x10_k16) {
+    /* Test 8x10 matrix with k=16 to trigger:
+     * - Full 8x8 block (lines 179-186: right edge with full M blocks)
+     * - Prefetch (lines 74-75: k > 8)
+     */
+    double A[128], B[160], C[80];
+
+    for (int i = 0; i < 128; i++) A[i] = 1.0;
+    for (int i = 0; i < 160; i++) B[i] = 1.0;
+    for (int i = 0; i < 80; i++) C[i] = 0.0;
+
+    int status = fc_mat_gemm_f64_scalar(8, 10, 16, 1.0, A, 16, B, 10, 0.0, C, 10);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(C[0] > 0.0);
+}
+
+TEST(test_gemm_scalar_10x8_beta) {
+    /* Test 10x8 matrix with beta != 0 to trigger:
+     * - Bottom edge with full N blocks (lines 193-200)
+     */
+    double A[80], B[64], C[80];
+
+    for (int i = 0; i < 80; i++) A[i] = 1.0;
+    for (int i = 0; i < 64; i++) B[i] = 1.0;
+    for (int i = 0; i < 80; i++) C[i] = 1.0;
+
+    int status = fc_mat_gemm_f64_scalar(10, 8, 8, 1.0, A, 8, B, 8, 0.5, C, 8);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(C[0] > 0.0);
+}
+
+TEST(test_gemm_scalar_8x8_beta_k16) {
+    /* Test 8x8 matrix with beta != 0 and k=16 to trigger:
+     * - Beta path in 8x8 kernel (lines 111-113)
+     * - Prefetch with k > 8 (lines 74-75)
+     */
+    double A[128], B[128], C[64];
+
+    for (int i = 0; i < 128; i++) A[i] = 1.0;
+    for (int i = 0; i < 128; i++) B[i] = 1.0;
+    for (int i = 0; i < 64; i++) C[i] = 2.0;
+
+    int status = fc_mat_gemm_f64_scalar(8, 8, 16, 1.0, A, 16, B, 8, 0.5, C, 8);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(C[0] > 0.0);
+}
+
+TEST(test_gemm_scalar_16x10_k16) {
+    /* Test 16x10 matrix with k=16 to trigger:
+     * - Multiple M blocks with right edge (lines 179-186)
+     * - Prefetch (lines 74-75)
+     */
+    double A[256], B[160], C[160];
+
+    for (int i = 0; i < 256; i++) A[i] = 1.0;
+    for (int i = 0; i < 160; i++) B[i] = 1.0;
+    for (int i = 0; i < 160; i++) C[i] = 0.0;
+
+    int status = fc_mat_gemm_f64_scalar(16, 10, 16, 1.0, A, 16, B, 10, 0.0, C, 10);
+    ASSERT_EQ(status, FC_OK);
+    ASSERT_TRUE(C[0] > 0.0);
+}
+
 void register_matrix_tests(void) {
     /* Vector operations - dot product */
     RUN_TEST(test_vec_dot_basic);
@@ -1895,6 +2150,10 @@ void register_matrix_tests(void) {
     RUN_TEST(test_vec_dot_invalid_args);
     RUN_TEST(test_vec_dot_zero);
     RUN_TEST(test_vec_dot_single);
+    RUN_TEST(test_vec_dot_size3);
+    RUN_TEST(test_vec_dot_size5);
+    RUN_TEST(test_vec_dot_size7);
+    RUN_TEST(test_vec_dot_size9);
 
     /* Vector operations - L2 norm */
     RUN_TEST(test_vec_norm_l2_basic);
@@ -1903,22 +2162,33 @@ void register_matrix_tests(void) {
     RUN_TEST(test_vec_norm_l2_large);
     RUN_TEST(test_vec_norm_l2_small);
     RUN_TEST(test_vec_norm_l2_invalid_args);
+    RUN_TEST(test_vec_norm_l2_size3);
+    RUN_TEST(test_vec_norm_l2_size5);
+    RUN_TEST(test_vec_norm_l2_size7);
 
     /* Vector operations - L1 norm */
     RUN_TEST(test_vec_norm_l1_basic);
     RUN_TEST(test_vec_norm_l1_zero);
     RUN_TEST(test_vec_norm_l1_invalid_args);
+    RUN_TEST(test_vec_norm_l1_size3);
+    RUN_TEST(test_vec_norm_l1_size5);
+    RUN_TEST(test_vec_norm_l1_size7);
+    RUN_TEST(test_vec_norm_l1_large_values);
 
     /* Vector operations - L2 distance */
     RUN_TEST(test_vec_distance_l2_basic);
     RUN_TEST(test_vec_distance_l2_single);
     RUN_TEST(test_vec_distance_l2_zero);
     RUN_TEST(test_vec_distance_l2_invalid_args);
+    RUN_TEST(test_vec_distance_l2_size5);
+    RUN_TEST(test_vec_distance_l2_size7);
 
     /* Vector operations - L1 distance */
     RUN_TEST(test_vec_distance_l1_basic);
     RUN_TEST(test_vec_distance_l1_zero);
     RUN_TEST(test_vec_distance_l1_invalid_args);
+    RUN_TEST(test_vec_distance_l1_size5);
+    RUN_TEST(test_vec_distance_l1_size7);
 
     /* GEMM */
     RUN_TEST(test_gemm_identity);
@@ -1937,6 +2207,10 @@ void register_matrix_tests(void) {
     RUN_TEST(test_gemm_scalar_edge_cases);
     RUN_TEST(test_gemm_scalar_large_4x4);
     RUN_TEST(test_gemm_scalar_with_beta);
+    RUN_TEST(test_gemm_scalar_8x10_k16);
+    RUN_TEST(test_gemm_scalar_10x8_beta);
+    RUN_TEST(test_gemm_scalar_8x8_beta_k16);
+    RUN_TEST(test_gemm_scalar_16x10_k16);
     RUN_TEST(test_gemm_sse42_direct);
 
     /* Additional coverage tests */
@@ -1985,11 +2259,13 @@ void register_matrix_tests(void) {
     RUN_TEST(test_gemm_sse42_m_remainder);
     RUN_TEST(test_gemm_sse42_both_remainder);
     RUN_TEST(test_gemm_sse42_n_remainder_beta);
+    RUN_TEST(test_gemm_sse42_k16);
 
     /* AVX2 GEMM direct tests */
     RUN_TEST(test_gemm_avx2_direct);
     RUN_TEST(test_gemm_avx2_with_beta);
     RUN_TEST(test_gemm_avx2_with_beta_4x8);
+    RUN_TEST(test_gemm_avx2_with_beta_1);
     RUN_TEST(test_gemm_avx2_n_remainder);
     RUN_TEST(test_gemm_avx2_m_remainder);
     RUN_TEST(test_gemm_avx2_both_remainder);
@@ -2013,6 +2289,7 @@ void register_matrix_tests(void) {
     /* Transpose internal implementation tests */
     RUN_TEST(test_transpose_blocked_direct);
     RUN_TEST(test_transpose_blocked_non_multiple);
+    RUN_TEST(test_transpose_large);
 
     /* Random tests for robustness */
     RUN_TEST(test_gemm_random_small);

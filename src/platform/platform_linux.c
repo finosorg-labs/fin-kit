@@ -21,7 +21,8 @@ static size_t fc_read_cache_size(const char* path) {
 
     size_t value = 0;
     char suffix = '\0';
-    if (fscanf(fp, "%zu%c", &value, &suffix) >= 1) {
+    /* fscanf is safe here: reading from trusted sysfs, bounded format */
+    if (fscanf(fp, "%zu%c", &value, &suffix) >= 1) {  /* NOLINT */
         switch (suffix) {
             case 'K': case 'k': value *= 1024; break;
             case 'M': case 'm': value *= 1024 * 1024; break;

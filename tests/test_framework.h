@@ -101,6 +101,9 @@ void fc_test_stats_print(const fc_test_stats_t* stats);
 
 /**
  * @brief Assertion with custom failure message
+ *
+ * Note: Uses GNU extension ##__VA_ARGS__ for optional variadic arguments.
+ * This is widely supported by GCC, Clang, and MSVC.
  */
 #define FC_TEST_ASSERT_MSG(cond, msg, ...) \
     do { \

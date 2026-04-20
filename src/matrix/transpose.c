@@ -42,6 +42,7 @@ static inline void transpose_4x4_avx2(const double* src, int ld_src,
     _mm256_storeu_pd(&dst[3 * ld_dst], col3);
 }
 
+__attribute__((unused))
 static inline void transpose_8x8_avx2(const double* src, int ld_src,
                                        double* dst, int ld_dst) {
     // Load 8 rows, each row has 8 doubles (need 2 AVX2 loads per row)

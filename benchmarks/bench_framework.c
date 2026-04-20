@@ -337,7 +337,7 @@ void fc_bench_run(
     }
 
     /* Main measurement run */
-    fc_bench_stats_t stats;
+    fc_bench_stats_t stats = {0};
     if (config->enable_stats) {
         fc_bench_stats_init(&stats);
     }

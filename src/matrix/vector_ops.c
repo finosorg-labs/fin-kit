@@ -125,6 +125,7 @@ int fc_vec_dot_f64(const double* x, const double* y, int64_t n, double* result) 
     }
 
     fc_simd_level_t level = fc_get_simd_level();
+    (void)level; /* May be unused if no SIMD paths are compiled */
 
 #if FC_HAS_AVX2
     if (level >= FC_SIMD_AVX2) {
@@ -227,6 +228,7 @@ int fc_vec_norm_l2_f64(const double* x, int64_t n, double* result) {
     }
 
     fc_simd_level_t level = fc_get_simd_level();
+    (void)level; /* May be unused if no SIMD paths are compiled */
 
 #if FC_HAS_AVX2
     if (level >= FC_SIMD_AVX2) {
