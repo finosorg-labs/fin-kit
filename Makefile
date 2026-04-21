@@ -99,14 +99,14 @@ windows:
 
 go:
 	@echo "==> Building Go module (verify compilation)"
-	cd go/fin-kit && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go build ./...
+	cd go && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go build ./...
 
 test: linux
 	@echo "==> Running C tests with coverage"
 	@bash scripts/test_coverage.sh $(LINUX_BUILD_DIR)
 	@echo ""
 	@echo "==> Running Go tests"
-	cd go/fin-kit && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test ./... -v
+	cd go && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test ./... -v
 
 bench:
 	@echo "==> Building benchmarks (Release mode)"
@@ -124,7 +124,7 @@ bench:
 	fi
 	@echo ""
 	@echo "==> Running Go benchmarks"
-	@cd go/fin-kit && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test -bench=. -benchmem ./...
+	@cd go && CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test -bench=. -benchmem ./...
 
 verify:
 	@echo "=== Verify artifact formats ===" && \

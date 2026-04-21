@@ -382,22 +382,22 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go/fin-kit/go.mod
+          go-version-file: go/go.mod
 
       - name: Build
-        working-directory: go/fin-kit
+        working-directory: go
         env:
           CC: gcc
         run: go build ./...
 
       - name: Vet
-        working-directory: go/fin-kit
+        working-directory: go
         env:
           CC: gcc
         run: go vet ./...
 
       - name: Test
-        working-directory: go/fin-kit
+        working-directory: go
         env:
           CC: gcc
         run: go test ./...
