@@ -414,3 +414,241 @@ func TestParseFieldsComparison(t *testing.T) {
 
 	t.Logf("Both parsing methods produced identical results for %d fields", soaResult.FieldCount)
 }
+
+// Benchmark tests
+
+func BenchmarkChecksum(b *testing.B) {
+	sizes := []struct {
+		name string
+		size int
+	}{
+		{"Small/50B", 50},
+		{"Medium/150B", 150},
+		{"Large/300B", 300},
+		{"XLarge/1KB", 1024},
+	}
+
+	for _, sz := range sizes {
+		b.Run(sz.name, func(b *testing.B) {
+			data := make([]byte, sz.size)
+			for i := range data {
+				data[i] = byte(i % 256)
+			}
+
+			b.ResetTimer()
+			b.SetBytes(int64(sz.size))
+			for i := 0; i < b.N; i++ {
+				_ = Checksum(data)
+			}
+		})
+	}
+}
+
+func BenchmarkParseOne(b *testing.B) {
+	messages := []struct {
+		name string
+		msg  string
+	}{
+		{
+			"Small/6fields",
+			"8=FIX.4.4\x019=40\x0135=D\x0149=SENDER\x0156=TARGET\x0110=000\x01",
+		},
+		{
+			"Medium/15fields",
+			"8=FIX.4.4\x019=150\x0135=D\x0149=SENDER\x0156=TARGET\x0134=1\x0152=20240101-12:00:00\x0111=ORDER123\x0121=1\x0155=AAPL\x0154=1\x0138=100\x0140=2\x0144=150.50\x0159=0\x0160=20240101-12:00:00\x0110=000\x01",
+		},
+		{
+			"Large/25fields",
+			"8=FIX.4.4\x019=300\x0135=D\x0149=SENDER\x0156=TARGET\x0134=1\x0152=20240101-12:00:00\x0111=ORDER123\x0121=1\x0155=AAPL\x0154=1\x0138=100\x0140=2\x0144=150.50\x0159=0\x0160=20240101-12:00:00\x011=ACCOUNT\x0147=A\x0163=0\x0164=20240102\x01109=CLIENT\x01110=DESK\x01111=100\x01526=ID123\x01453=1\x01448=PARTY\x01447=D\x01452=1\x0110=000\x01",
+		},
+	}
+
+	for _, msg := range messages {
+		b.Run(msg.name, func(b *testing.B) {
+			data := []byte(msg.msg)
+			b.SetBytes(int64(len(data)))
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = ParseOne(data)
+			}
+		})
+	}
+}
+
+func BenchmarkParseMessages(b *testing.B) {
+	smallMsg := "8=FIX.4.4\x019=40\x0135=D\x0149=SENDER\x0156=TARGET\x0110=000\x01"
+
+	batches := []struct {
+		name  string
+		count int
+	}{
+		{"1msg", 1},
+		{"10msg", 10},
+		{"100msg", 100},
+		{"1000msg", 1000},
+	}
+
+	for _, batch := range batches {
+		b.Run(batch.name, func(b *testing.B) {
+			// Create batch of messages
+			var buf bytes.Buffer
+			for i := 0; i < batch.count; i++ {
+				buf.WriteString(smallMsg)
+			}
+			data := buf.Bytes()
+			b.SetBytes(int64(len(data)))
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _, _ = ParseMessages(data)
+			}
+		})
+	}
+}
+
+func BenchmarkMarshalMessage(b *testing.B) {
+	tests := []struct {
+		name   string
+		fields []MarshalField
+	}{
+		{
+			"Small/3fields",
+			[]MarshalField{
+				{Tag: 35, Value: []byte("D")},
+				{Tag: 49, Value: []byte("SENDER")},
+				{Tag: 56, Value: []byte("TARGET")},
+			},
+		},
+		{
+			"Medium/10fields",
+			[]MarshalField{
+				{Tag: 35, Value: []byte("D")},
+				{Tag: 49, Value: []byte("SENDER")},
+				{Tag: 56, Value: []byte("TARGET")},
+				{Tag: 34, Value: []byte("1")},
+				{Tag: 52, Value: []byte("20240101-12:00:00")},
+				{Tag: 11, Value: []byte("ORDER123")},
+				{Tag: 55, Value: []byte("AAPL")},
+				{Tag: 54, Value: []byte("1")},
+				{Tag: 38, Value: []byte("100")},
+				{Tag: 44, Value: []byte("150.50")},
+			},
+		},
+		{
+			"Large/20fields",
+			[]MarshalField{
+				{Tag: 35, Value: []byte("D")},
+				{Tag: 49, Value: []byte("SENDER")},
+				{Tag: 56, Value: []byte("TARGET")},
+				{Tag: 34, Value: []byte("1")},
+				{Tag: 52, Value: []byte("20240101-12:00:00")},
+				{Tag: 11, Value: []byte("ORDER123")},
+				{Tag: 55, Value: []byte("AAPL")},
+				{Tag: 54, Value: []byte("1")},
+				{Tag: 38, Value: []byte("100")},
+				{Tag: 44, Value: []byte("150.50")},
+				{Tag: 1, Value: []byte("ACCOUNT")},
+				{Tag: 47, Value: []byte("A")},
+				{Tag: 63, Value: []byte("0")},
+				{Tag: 64, Value: []byte("20240102")},
+				{Tag: 109, Value: []byte("CLIENT")},
+				{Tag: 110, Value: []byte("DESK")},
+				{Tag: 111, Value: []byte("100")},
+				{Tag: 526, Value: []byte("ID123")},
+				{Tag: 453, Value: []byte("1")},
+				{Tag: 448, Value: []byte("PARTY")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			outputBuf := make([]byte, 1024)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = MarshalMessage("FIX.4.4", tt.fields, outputBuf)
+			}
+		})
+	}
+}
+
+func BenchmarkRoundtrip(b *testing.B) {
+	fields := []MarshalField{
+		{Tag: 35, Value: []byte("D")},
+		{Tag: 49, Value: []byte("SENDER")},
+		{Tag: 56, Value: []byte("TARGET")},
+		{Tag: 34, Value: []byte("1")},
+		{Tag: 52, Value: []byte("20240101-12:00:00")},
+		{Tag: 11, Value: []byte("ORDER123")},
+	}
+
+	outputBuf := make([]byte, 512)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Marshal
+		result, err := MarshalMessage("FIX.4.4", fields, outputBuf)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Parse
+		marshaled := outputBuf[:result.OutputLength]
+		_, err = ParseOne(marshaled)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkParseFieldsInto(b *testing.B) {
+	// Create test message
+	fields := []MarshalField{
+		{Tag: 35, Value: []byte("D")},
+		{Tag: 49, Value: []byte("SENDER")},
+		{Tag: 56, Value: []byte("TARGET")},
+		{Tag: 34, Value: []byte("1")},
+		{Tag: 52, Value: []byte("20240101-12:00:00")},
+	}
+
+	buffer := make([]byte, 512)
+	marshalResult, err := MarshalMessage("FIX.4.4", fields, buffer)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	data := buffer[:marshalResult.OutputLength]
+	b.SetBytes(int64(len(data)))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseFieldsInto(data, MaxFieldsPerMessage)
+	}
+}
+
+func BenchmarkParseFieldsAoS(b *testing.B) {
+	// Create test message
+	fields := []MarshalField{
+		{Tag: 35, Value: []byte("D")},
+		{Tag: 49, Value: []byte("SENDER")},
+		{Tag: 56, Value: []byte("TARGET")},
+		{Tag: 34, Value: []byte("1")},
+		{Tag: 52, Value: []byte("20240101-12:00:00")},
+	}
+
+	buffer := make([]byte, 512)
+	marshalResult, err := MarshalMessage("FIX.4.4", fields, buffer)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	data := buffer[:marshalResult.OutputLength]
+	b.SetBytes(int64(len(data)))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = ParseFieldsAoS(data, MaxFieldsPerMessage)
+	}
+}

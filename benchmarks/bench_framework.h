@@ -81,6 +81,8 @@ typedef struct {
     double stddev_ns;       /* standard deviation */
     double min_ns;          /* minimum time */
     double max_ns;          /* maximum time */
+    size_t bytes_per_op;    /* bytes allocated per operation */
+    size_t allocs_per_op;   /* number of allocations per operation */
 } fc_bench_result_t;
 
 /**

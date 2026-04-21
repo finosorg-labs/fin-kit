@@ -7,16 +7,37 @@ if(NOT FC_BUILD_BENCHMARKS)
     return()
 endif()
 
-# Benchmark executable
-add_executable(finkit_benchmarks
+# Benchmark framework library
+add_library(bench_framework OBJECT
     bench_framework.c
-    bench_main.c
-    matrix/bench_matrix.c
 )
 
-# Link with combined library (includes platform + matrix)
+target_include_directories(bench_framework
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_BINARY_DIR}/include
+)
+
+target_link_libraries(bench_framework
+    PUBLIC
+        finkit::finkit
+)
+
+# Benchmark executable
+add_executable(finkit_benchmarks
+    bench_main.c
+    matrix/bench_matrix.c
+    codec/bench_fix_codec.c
+)
+
+# Add codec benchmarks subdirectory
+add_subdirectory(codec)
+
+# Link with benchmark framework and combined library
 target_link_libraries(finkit_benchmarks
     PRIVATE
+        bench_framework
         finkit::finkit
 )
 

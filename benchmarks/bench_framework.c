@@ -113,36 +113,26 @@ uint64_t fc_bench_time_elapsed_ns(const fc_bench_time_t* start, const fc_bench_t
 */
 
 void fc_bench_result_print(const fc_bench_result_t* result) {
-    printf("\n============================================================\n");
-    printf("Benchmark: %s\n", result->name);
-    printf("------------------------------------------------------------\n");
-    printf("  Data size:      %zu bytes\n", result->data_size);
-    printf("  Iterations:     %lu\n", (unsigned long)result->iterations);
-    printf("  Time:           %.3f ms\n", result->elapsed_ms);
-
-    if (result->iterations > 0) {
-        printf("  Mean:           %.2f ns/iter\n", result->mean_ns);
-    }
+    /* Go-style compact output format */
+    printf("%-50s\t%10lu\t%12.2f ns/op",
+           result->name,
+           (unsigned long)result->iterations,
+           result->mean_ns);
 
     if (result->throughput_gb_s > 0) {
-        printf("  Throughput:     %.2f GB/s\n", result->throughput_gb_s);
+        printf("\t%10.2f MB/s", result->throughput_gb_s * 1024.0);
     }
 
     if (result->gflops > 0) {
-        printf("  GFLOPS:         %.2f\n", result->gflops);
+        printf("\t%10.2f GFLOPS", result->gflops);
     }
 
-    if (result->ops_per_sec > 0) {
-        printf("  Ops/sec:        %.2e\n", result->ops_per_sec);
+    /* Only show memory allocation metrics if non-zero */
+    if (result->bytes_per_op > 0 || result->allocs_per_op > 0) {
+        printf("\t%8zu B/op\t%8zu allocs/op", result->bytes_per_op, result->allocs_per_op);
     }
 
-    if (result->stddev_ns > 0 || result->min_ns > 0 || result->max_ns > 0) {
-        printf("  StdDev:         %.2f ns\n", result->stddev_ns);
-        printf("  Min:            %.2f ns\n", result->min_ns);
-        printf("  Max:            %.2f ns\n", result->max_ns);
-    }
-
-    printf("============================================================\n");
+    printf("\n");
 }
 
 void fc_bench_result_print_csv(const fc_bench_result_t* result, FILE* fp) {
@@ -375,6 +365,9 @@ void fc_bench_run(
     if (result->data_size > 0 && result->elapsed_ms > 0) {
         result->throughput_gb_s = fc_bench_throughput_gb_s(result->data_size, result->elapsed_ms);
     }
+
+    /* Note: bytes_per_op and allocs_per_op should be set by the benchmark
+     * if it performs memory allocations. They default to 0 (no allocations). */
 
     /* Print result */
     if (!config->quiet && g_verbose) {

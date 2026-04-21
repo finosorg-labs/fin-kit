@@ -115,13 +115,6 @@ static void run_gemm_benchmarks(void) {
         fc_bench_result_t result;
         fc_bench_run(&config, bench_gemm_fn, &data, &result);
 
-        /* GEMM FLOPS = 2*m*n*k */
-        double flops = 2.0 * n * n * n;
-        result.gflops = fc_bench_gflops(flops * result.iterations,
-                                        result.elapsed_ms);
-        printf("  %s: %.2f GFLOPS, %.2f ns/iter\n",
-               name, result.gflops, result.mean_ns);
-
         free(data.A);
         free(data.B);
         free(data.C);
@@ -162,13 +155,6 @@ static void run_gemv_benchmarks(void) {
         fc_bench_result_t result;
         fc_bench_run(&config, bench_gemv_fn, &data, &result);
 
-        /* GEMV FLOPS = 2*m*n */
-        double flops = 2.0 * n * n;
-        result.gflops = fc_bench_gflops(flops * result.iterations,
-                                        result.elapsed_ms);
-        printf("  %s: %.2f GFLOPS, %.2f ns/iter\n",
-               name, result.gflops, result.mean_ns);
-
         free(data.A);
         free(data.x);
         free(data.y);
@@ -205,12 +191,6 @@ static void run_transpose_benchmarks(void) {
 
         fc_bench_result_t result;
         fc_bench_run(&config, bench_transpose_fn, &data, &result);
-
-        double bytes = 2.0 * n * n * sizeof(double);
-        result.throughput_gb_s = fc_bench_throughput_gb_s(
-            (size_t)bytes, result.elapsed_ms / result.iterations);
-        printf("  %s: %.2f GB/s, %.2f ns/iter\n",
-               name, result.throughput_gb_s, result.mean_ns);
 
         free(data.src);
         free(data.dst);
@@ -249,13 +229,6 @@ static void run_vector_benchmarks(void) {
 
             fc_bench_result_t result;
             fc_bench_run(&config, bench_vec_dot_fn, &data, &result);
-
-            /* Dot product: 2n FLOPS (n multiplies + n adds) */
-            double flops = 2.0 * n;
-            result.gflops = fc_bench_gflops(flops * result.iterations,
-                                            result.elapsed_ms);
-            printf("  %s: %.2f GFLOPS, %.2f ns/iter\n",
-                   name, result.gflops, result.mean_ns);
         }
 
         /* VecNormL2 */
@@ -271,12 +244,6 @@ static void run_vector_benchmarks(void) {
 
             fc_bench_result_t result;
             fc_bench_run(&config, bench_vec_norm_l2_fn, &data, &result);
-
-            double flops = 2.0 * n + 1; /* n mul + n add + 1 sqrt */
-            result.gflops = fc_bench_gflops(flops * result.iterations,
-                                            result.elapsed_ms);
-            printf("  %s: %.2f GFLOPS, %.2f ns/iter\n",
-                   name, result.gflops, result.mean_ns);
         }
 
         free(data.x);
