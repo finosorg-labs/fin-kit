@@ -13,6 +13,7 @@ add_executable(finkit_tests
     test_main.c
     test_matrix.c
     test_precision.c
+    test_fix_codec.c
 )
 
 # Link with finkit library (includes all modules)

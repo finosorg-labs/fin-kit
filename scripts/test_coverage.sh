@@ -26,51 +26,70 @@ cd "$BUILD_DIR"
 # Generate coverage report
 echo ""
 echo "============================================================"
-echo "Coverage Report - Matrix Module"
+echo "Coverage Report - All Modules"
 echo "============================================================"
 echo ""
 
-# Process matrix module files
-total_lines=0
-total_executed=0
+# Find all modules with coverage data
+modules=$(find src -name "*.gcda" 2>/dev/null | sed 's|src/\([^/]*\)/.*|\1|' | sort -u)
 
-for gcda in $(find src/matrix -name "*.gcda" 2>/dev/null | sort); do
-    dir=$(dirname "$gcda")
-    base=$(basename "$gcda" .gcda)
-    # base is like "gemm_dispatch.c", extract the actual filename
-    filename="$base"
-
-    # Run gcov in the directory containing the .gcda/.gcno files
-    output=$(cd "$dir" && gcov "$base.gcda" 2>/dev/null)
-
-    # Extract coverage info
-    if echo "$output" | grep -q "Lines executed"; then
-        percent=$(echo "$output" | grep "Lines executed" | head -1 | sed 's/Lines executed:\([0-9.]*\)% of \([0-9]*\)/\1/')
-        lines=$(echo "$output" | grep "Lines executed" | head -1 | sed 's/Lines executed:\([0-9.]*\)% of \([0-9]*\)/\2/')
-
-        if [ -n "$lines" ] && [ -n "$percent" ]; then
-            executed=$(awk "BEGIN {printf \"%.0f\", $lines * $percent / 100}")
-            printf "%-30s %6d / %6d lines (%6.2f%%)\n" "$filename" "$executed" "$lines" "$percent"
-            total_lines=$((total_lines + lines))
-            total_executed=$((total_executed + executed))
-        fi
-    fi
-done
-
-if [ "$total_lines" -gt 0 ]; then
-    overall=$(awk "BEGIN {printf \"%.2f\", ($total_executed / $total_lines) * 100}")
-    echo ""
-    echo "------------------------------------------------------------"
-    printf "%-30s %6d / %6d lines (%6.2f%%)\n" "TOTAL" "$total_executed" "$total_lines" "$overall"
-    echo "============================================================"
-else
+if [ -z "$modules" ]; then
     echo "No coverage data found. Make sure the build was configured with coverage flags."
     exit 1
 fi
 
+# Process each module
+grand_total_lines=0
+grand_total_executed=0
+
+for module in $modules; do
+    echo "Module: $module"
+    echo "------------------------------------------------------------"
+
+    module_total_lines=0
+    module_total_executed=0
+
+    for gcda in $(find "src/$module" -name "*.gcda" 2>/dev/null | sort); do
+        dir=$(dirname "$gcda")
+        base=$(basename "$gcda" .gcda)
+        filename="$base"
+
+        # Run gcov in the directory containing the .gcda/.gcno files
+        output=$(cd "$dir" && gcov "$base.gcda" 2>/dev/null)
+
+        # Extract coverage info
+        if echo "$output" | grep -q "Lines executed"; then
+            percent=$(echo "$output" | grep "Lines executed" | head -1 | sed 's/Lines executed:\([0-9.]*\)% of \([0-9]*\)/\1/')
+            lines=$(echo "$output" | grep "Lines executed" | head -1 | sed 's/Lines executed:\([0-9.]*\)% of \([0-9]*\)/\2/')
+
+            if [ -n "$lines" ] && [ -n "$percent" ]; then
+                executed=$(awk "BEGIN {printf \"%.0f\", $lines * $percent / 100}")
+                printf "  %-28s %6d / %6d lines (%6.2f%%)\n" "$filename" "$executed" "$lines" "$percent"
+                module_total_lines=$((module_total_lines + lines))
+                module_total_executed=$((module_total_executed + executed))
+            fi
+        fi
+    done
+
+    if [ "$module_total_lines" -gt 0 ]; then
+        module_overall=$(awk "BEGIN {printf \"%.2f\", ($module_total_executed / $module_total_lines) * 100}")
+        printf "  %-28s %6d / %6d lines (%6.2f%%)\n" "Subtotal" "$module_total_executed" "$module_total_lines" "$module_overall"
+        grand_total_lines=$((grand_total_lines + module_total_lines))
+        grand_total_executed=$((grand_total_executed + module_total_executed))
+    fi
+    echo ""
+done
+
+if [ "$grand_total_lines" -gt 0 ]; then
+    overall=$(awk "BEGIN {printf \"%.2f\", ($grand_total_executed / $grand_total_lines) * 100}")
+    echo "============================================================"
+    printf "%-30s %6d / %6d lines (%6.2f%%)\n" "TOTAL (All Modules)" "$grand_total_executed" "$grand_total_lines" "$overall"
+    echo "============================================================"
+fi
+
 echo ""
 echo "Detailed .gcov files available in:"
-echo "  $BUILD_DIR/src/matrix/CMakeFiles/matrix_obj.dir/"
+echo "  $BUILD_DIR/src/*/CMakeFiles/*_obj.dir/"
 echo ""
 
 exit 0

@@ -210,6 +210,9 @@ set(ALL_OBJECTS $<TARGET_OBJECTS:finkit_platform>)
 if(TARGET matrix_obj)
     list(APPEND ALL_OBJECTS $<TARGET_OBJECTS:matrix_obj>)
 endif()
+if(TARGET codec_obj)
+    list(APPEND ALL_OBJECTS $<TARGET_OBJECTS:codec_obj>)
+endif()
 
 # Create combined library for users who link against the whole library
 if(ALL_EXPORTS)

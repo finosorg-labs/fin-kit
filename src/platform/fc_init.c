@@ -6,6 +6,7 @@
 #include <fin-kit/platform/platform.h>
 #include <fin-kit/platform/simd_detect.h>
 #include <fin-kit/platform/error.h>
+#include <fin-kit/codec/codec.h>
 
 #include <stdatomic.h>
 
@@ -28,6 +29,9 @@ int fc_init(void) {
         atomic_store(&g_fc_initialized, 0);
         return FC_ERR_ILLEGAL_STATE;
     }
+
+    /* Initialize codec subsystems */
+    fc_fix_codec_init();
 
     return FC_OK;
 }

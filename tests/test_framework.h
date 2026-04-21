@@ -105,6 +105,10 @@ void fc_test_stats_print(const fc_test_stats_t* stats);
  * Note: Uses GNU extension ##__VA_ARGS__ for optional variadic arguments.
  * This is widely supported by GCC, Clang, and MSVC.
  */
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#endif
 #define FC_TEST_ASSERT_MSG(cond, msg, ...) \
     do { \
         if (!(cond)) { \
@@ -114,6 +118,9 @@ void fc_test_stats_print(const fc_test_stats_t* stats);
             return; \
         } \
     } while (0)
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 /**
  * @brief Assert that two values are equal

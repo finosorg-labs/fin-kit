@@ -1,0 +1,15 @@
+---
+# clang-tidy configuration for fin-kit
+# Suppresses warnings for optional C11 Annex K secure functions
+
+Checks: '-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
+
+# Rationale:
+# - C11 Annex K (secure functions like memcpy_s, memset_s) is optional and not widely supported
+# - All memory operations in this codebase have proper bounds checking
+# - Using standard C functions (memcpy, memset, snprintf) is appropriate for cross-platform code
+# - The code follows defensive programming practices with input validation
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: file
