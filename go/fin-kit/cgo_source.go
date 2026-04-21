@@ -30,6 +30,9 @@ package fin_kit
   #include "../../src/platform/platform_win.c"
 #endif
 
+// Codec sources
+#include "../../src/codec/fix_codec.c"
+
 // Matrix sources - scalar and dispatch
 #include "../../src/matrix/gemm_scalar.c"
 #include "../../src/matrix/gemm_dispatch.c"

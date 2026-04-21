@@ -11,9 +11,9 @@ endif()
 add_executable(finkit_tests
     test_framework.c
     test_main.c
-    test_matrix.c
-    test_precision.c
-    test_fix_codec.c
+    matrix/test_matrix.c
+    matrix/test_precision.c
+    codec/test_fix_codec.c
 )
 
 # Link with finkit library (includes all modules)
@@ -33,6 +33,7 @@ target_include_directories(finkit_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Compiler flags for tests
