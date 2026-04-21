@@ -3,11 +3,14 @@ package platform
 
 /*
 #cgo CFLAGS: -I../../../include
+#cgo linux LDFLAGS: -L../../../build/linux_amd64/lib -lfinkit -lgcov -lm
+#cgo darwin LDFLAGS: -L../../../build/darwin_amd64/lib -lfinkit
+#cgo windows LDFLAGS: -L../../../build/windows_amd64/lib -lfinkit
+
 #include <fin-kit/platform/platform.h>
 #include <fin-kit/platform/simd_detect.h>
 #include <fin-kit/platform/mem_aligned.h>
 #include <fin-kit/platform/error.h>
-#include <stdint.h>
 
 // Forward declarations for fc_init/fc_cleanup (no public header)
 int fc_init(void);

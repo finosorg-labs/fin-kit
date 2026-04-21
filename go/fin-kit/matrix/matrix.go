@@ -3,9 +3,10 @@ package matrix
 
 /*
 #cgo CFLAGS: -I../../../include
-#include <stdint.h>
-#include <stdlib.h>
-#include <fin-kit/platform/platform.h>
+#cgo linux LDFLAGS: -L../../../build/linux_amd64/lib -lfinkit -lgcov -lm
+#cgo darwin LDFLAGS: -L../../../build/darwin_amd64/lib -lfinkit
+#cgo windows LDFLAGS: -L../../../build/windows_amd64/lib -lfinkit
+
 #include <fin-kit/matrix/matrix.h>
 */
 import "C"
