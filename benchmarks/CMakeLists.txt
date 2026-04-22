@@ -35,6 +35,7 @@ add_executable(finkit_benchmarks
     matrix/bench_decompose.c
     matrix/bench_solve.c
     matrix/bench_tridiag.c
+    codec/bench_codec.c
     codec/bench_fix_codec.c
 )
 

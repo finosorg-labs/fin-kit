@@ -383,7 +383,7 @@ static void run_roundtrip_benchmarks(void) {
 /**
  * @brief Run all FIX codec benchmarks
  */
-void bench_codec_run(void) {
+void bench_fix_codec_run(void) {
     printf("\n");
     printf("FIX Codec Benchmarks\n");
     printf("Platform: %s, Arch: %s, SIMD: %s\n",
