@@ -9,9 +9,9 @@
 #include <math.h>
 #include <string.h>
 #include <float.h>
-#include <fin-kit/matrix/matrix.h>
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/error.h>
+#include <matrix/matrix.h>
+#include <platform/platform.h>
+#include <platform/error.h>
 
 /*
  * Helper functions

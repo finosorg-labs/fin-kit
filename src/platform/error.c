@@ -6,7 +6,7 @@
  * Table is indexed by -code (enum values are 0, -1, -2, ...) for O(1) lookup.
  */
 
-#include <fin-kit/platform/error.h>
+#include <platform/error.h>
 
 /*
  * Error code to string mapping table

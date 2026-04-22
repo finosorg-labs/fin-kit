@@ -9,7 +9,7 @@
 #ifndef FC_FIN_KIT_H
 #define FC_FIN_KIT_H
 
-#include <fin-kit/version.h>
+#include <version.h>
 
 #ifdef __cplusplus
 extern "C" {

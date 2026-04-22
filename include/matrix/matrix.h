@@ -16,7 +16,7 @@
 #ifndef FC_MATRIX_H
 #define FC_MATRIX_H
 
-#include <fin-kit/version.h>
+#include <version.h>
 #include <stddef.h>
 #include <stdint.h>
 

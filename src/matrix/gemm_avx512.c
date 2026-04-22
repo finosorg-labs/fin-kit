@@ -8,8 +8,8 @@
  */
 
 #include <string.h>
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/error.h>
+#include <platform/platform.h>
+#include <platform/error.h>
 
 #if FC_HAS_AVX512
 #include <immintrin.h>

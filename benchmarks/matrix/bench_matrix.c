@@ -7,8 +7,8 @@
  */
 
 #include "bench_framework.h"
-#include <fin-kit/matrix/matrix.h>
-#include <fin-kit/platform/simd_detect.h>
+#include <matrix/matrix.h>
+#include <platform/simd_detect.h>
 
 #include <stdlib.h>
 #include <string.h>

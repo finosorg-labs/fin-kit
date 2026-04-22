@@ -3,7 +3,7 @@
  */
 
 #include "test_framework.h"
-#include <fin-kit/codec/fix_codec.h>
+#include <codec/fix_codec.h>
 #include <string.h>
 
 /*

@@ -3,7 +3,7 @@ package codec
 /*
 #include <stdlib.h>
 #include <string.h>
-#include <fin-kit/codec/fix_codec.h>
+#include <codec/fix_codec.h>
 */
 import "C"
 

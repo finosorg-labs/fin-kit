@@ -15,10 +15,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/error.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/matrix/matrix_internal.h>
+#include <platform/platform.h>
+#include <platform/error.h>
+#include <platform/simd_detect.h>
+#include <matrix/matrix_internal.h>
 
 /* Cache blocking parameters */
 #define GEMV_KC 512  /* Column block size (L1 cache) */

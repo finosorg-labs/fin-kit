@@ -9,7 +9,7 @@
 #ifndef FC_CODEC_H
 #define FC_CODEC_H
 
-#include <fin-kit/codec/fix_codec.h>
+#include <codec/fix_codec.h>
 
 #ifdef __cplusplus
 extern "C" {

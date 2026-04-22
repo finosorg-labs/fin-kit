@@ -13,10 +13,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include "test_framework.h"
-#include <fin-kit/matrix/matrix.h>
-#include <fin-kit/platform/error.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/matrix/matrix_internal.h>
+#include <matrix/matrix.h>
+#include <platform/error.h>
+#include <platform/simd_detect.h>
+#include <matrix/matrix_internal.h>
 
 /* Test tolerance for floating-point comparisons */
 #define TEST_EPSILON 1e-12

@@ -9,11 +9,11 @@ package fin_kit
 #cgo CFLAGS: -I../include -I../src -O2 -Wall -std=c11 -D_POSIX_C_SOURCE=200112L
 #cgo LDFLAGS: -lm
 
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/platform/mem_aligned.h>
-#include <fin-kit/platform/error.h>
-#include <fin-kit/matrix/matrix.h>
+#include <platform/platform.h>
+#include <platform/simd_detect.h>
+#include <platform/mem_aligned.h>
+#include <platform/error.h>
+#include <matrix/matrix.h>
 
 // Platform sources
 #include "../src/platform/simd_detect.c"

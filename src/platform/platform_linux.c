@@ -5,7 +5,7 @@
  * Provides Linux platform cache size detection and other system information.
  */
 
-#include <fin-kit/platform/platform.h>
+#include <platform/platform.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

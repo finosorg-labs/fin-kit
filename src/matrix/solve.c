@@ -10,10 +10,10 @@
 #include <string.h>
 #include <float.h>
 #include <stdlib.h>
-#include <fin-kit/matrix/matrix.h>
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/error.h>
-#include <fin-kit/platform/mem_aligned.h>
+#include <matrix/matrix.h>
+#include <platform/platform.h>
+#include <platform/error.h>
+#include <platform/mem_aligned.h>
 
 /*
  * Linear system solver

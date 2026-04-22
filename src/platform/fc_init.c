@@ -3,10 +3,10 @@
  * @brief Library initialization and version query implementation
  */
 
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/platform/error.h>
-#include <fin-kit/codec/codec.h>
+#include <platform/platform.h>
+#include <platform/simd_detect.h>
+#include <platform/error.h>
+#include <codec/codec.h>
 
 #include <stdatomic.h>
 

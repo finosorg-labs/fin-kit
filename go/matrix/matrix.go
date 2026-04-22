@@ -7,7 +7,7 @@ package matrix
 #cgo darwin LDFLAGS: -L../../build/darwin_amd64/lib -lfinkit
 #cgo windows LDFLAGS: -L../../build/windows_amd64/lib -lfinkit
 
-#include <fin-kit/matrix/matrix.h>
+#include <matrix/matrix.h>
 */
 import "C"
 

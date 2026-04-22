@@ -9,9 +9,9 @@
  *   - Tag parsing: 1-4 digit branch unrolling
  */
 
-#include <fin-kit/codec/fix_codec.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/platform/platform.h>
+#include <codec/fix_codec.h>
+#include <platform/simd_detect.h>
+#include <platform/platform.h>
 #include <string.h>
 #include <stdio.h>
 

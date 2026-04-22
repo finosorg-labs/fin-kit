@@ -19,8 +19,8 @@
 #ifndef FC_FIX_CODEC_H
 #define FC_FIX_CODEC_H
 
-#include <fin-kit/platform/platform.h>
-#include <fin-kit/platform/error.h>
+#include <platform/platform.h>
+#include <platform/error.h>
 
 FC_BEGIN_DECLS
 

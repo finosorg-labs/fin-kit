@@ -6,8 +6,8 @@
  * Supports Windows, Linux, and macOS platform APIs.
  */
 
-#include <fin-kit/platform/mem_aligned.h>
-#include <fin-kit/platform/simd_detect.h>
+#include <platform/mem_aligned.h>
+#include <platform/simd_detect.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>

@@ -4,7 +4,7 @@
  */
 
 #include "test_framework.h"
-#include <fin-kit/fin-kit.h>
+#include <fin-kit.h>
 #include <stdio.h>
 #include <stdlib.h>
 

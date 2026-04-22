@@ -10,9 +10,9 @@
  * practical matrix sizes and avoids SIMD register width issues).
  */
 
-#include <fin-kit/matrix/matrix.h>
-#include <fin-kit/platform/simd_detect.h>
-#include <fin-kit/platform/error.h>
+#include <matrix/matrix.h>
+#include <platform/simd_detect.h>
+#include <platform/error.h>
 
 #include <limits.h>
 
