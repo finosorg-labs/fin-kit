@@ -12,6 +12,13 @@ add_executable(finkit_tests
     test_framework.c
     test_main.c
     matrix/test_matrix.c
+    matrix/test_vector_ops.c
+    matrix/test_gemm.c
+    matrix/test_gemv.c
+    matrix/test_transpose.c
+    matrix/test_decompose.c
+    matrix/test_solve.c
+    matrix/test_tridiag.c
     matrix/test_precision.c
     codec/test_fix_codec.c
 )

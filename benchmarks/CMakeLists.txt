@@ -28,6 +28,13 @@ target_link_libraries(bench_framework
 add_executable(finkit_benchmarks
     bench_main.c
     matrix/bench_matrix.c
+    matrix/bench_vector_ops.c
+    matrix/bench_gemm.c
+    matrix/bench_gemv.c
+    matrix/bench_transpose.c
+    matrix/bench_decompose.c
+    matrix/bench_solve.c
+    matrix/bench_tridiag.c
     codec/bench_fix_codec.c
 )
 

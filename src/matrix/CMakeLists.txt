@@ -11,6 +11,7 @@ set(MATRIX_SOURCES
     transpose.c
     decompose.c
     solve.c
+    tridiag.c
 )
 
 # Create object library for matrix module
