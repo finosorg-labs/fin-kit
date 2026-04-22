@@ -726,6 +726,312 @@ TEST(test_gemm_precision_large_values) {
 }
 
 /*
+ * Matrix decomposition tests
+*/
+
+TEST(test_lu_decompose_basic) {
+    /* Test 3x3 matrix */
+    double A[] = {
+        2.0, 1.0, 1.0,
+        4.0, 3.0, 3.0,
+        8.0, 7.0, 9.0
+    };
+    int64_t ipiv[3];
+
+    int status = fc_mat_lu_decompose_f64(3, A, 3, ipiv);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Check that diagonal elements are non-zero */
+    ASSERT_TRUE(fabs(A[0]) > TEST_EPSILON);
+    ASSERT_TRUE(fabs(A[4]) > TEST_EPSILON);
+    ASSERT_TRUE(fabs(A[8]) > TEST_EPSILON);
+}
+
+TEST(test_lu_decompose_identity) {
+    double A[] = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+    int64_t ipiv[3];
+
+    int status = fc_mat_lu_decompose_f64(3, A, 3, ipiv);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Identity should remain identity */
+    ASSERT_TRUE(double_equals(A[0], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[4], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[8], 1.0, TEST_EPSILON));
+}
+
+TEST(test_lu_decompose_singular) {
+    /* Singular matrix (row 2 = row 1) */
+    double A[] = {
+        1.0, 2.0, 3.0,
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0
+    };
+    int64_t ipiv[3];
+
+    int status = fc_mat_lu_decompose_f64(3, A, 3, ipiv);
+    ASSERT_EQ(status, FC_ERR_SINGULAR_MATRIX);
+}
+
+TEST(test_lu_decompose_invalid_args) {
+    double A[9];
+    int64_t ipiv[3];
+
+    ASSERT_EQ(fc_mat_lu_decompose_f64(3, NULL, 3, ipiv), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_lu_decompose_f64(3, A, 3, NULL), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_lu_decompose_f64(0, A, 3, ipiv), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_lu_decompose_f64(-1, A, 3, ipiv), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_lu_decompose_f64(3, A, 2, ipiv), FC_ERR_INVALID_ARG);
+}
+
+TEST(test_qr_decompose_basic) {
+    /* Test 3x3 matrix */
+    double A[] = {
+        12.0, -51.0, 4.0,
+        6.0, 167.0, -68.0,
+        -4.0, 24.0, -41.0
+    };
+    double tau[3];
+
+    int status = fc_mat_qr_decompose_f64(3, 3, A, 3, tau);
+    ASSERT_EQ(status, FC_OK);
+
+    /* R diagonal should be non-zero */
+    ASSERT_TRUE(fabs(A[0]) > TEST_EPSILON);
+    ASSERT_TRUE(fabs(A[4]) > TEST_EPSILON);
+    ASSERT_TRUE(fabs(A[8]) > TEST_EPSILON);
+}
+
+TEST(test_qr_decompose_tall) {
+    /* Test 4x3 tall matrix */
+    double A[] = {
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0,
+        7.0, 8.0, 9.0,
+        10.0, 11.0, 12.0
+    };
+    double tau[3];
+
+    int status = fc_mat_qr_decompose_f64(4, 3, A, 3, tau);
+    ASSERT_EQ(status, FC_OK);
+}
+
+TEST(test_qr_decompose_invalid_args) {
+    double A[12];
+    double tau[3];
+
+    ASSERT_EQ(fc_mat_qr_decompose_f64(4, 3, NULL, 3, tau), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_qr_decompose_f64(4, 3, A, 3, NULL), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_qr_decompose_f64(0, 3, A, 3, tau), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_qr_decompose_f64(4, 0, A, 3, tau), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_qr_decompose_f64(2, 3, A, 3, tau), FC_ERR_DIMENSION_MISMATCH);
+    ASSERT_EQ(fc_mat_qr_decompose_f64(4, 3, A, 2, tau), FC_ERR_INVALID_ARG);
+}
+
+TEST(test_cholesky_decompose_basic) {
+    /* Symmetric positive definite matrix */
+    double A[] = {
+        4.0, 12.0, -16.0,
+        12.0, 37.0, -43.0,
+        -16.0, -43.0, 98.0
+    };
+
+    int status = fc_mat_cholesky_decompose_f64(3, A, 3);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Verify L * L^T = original A by checking diagonal elements */
+    ASSERT_TRUE(A[0] > 0.0);
+    ASSERT_TRUE(A[4] > 0.0);
+    ASSERT_TRUE(A[8] > 0.0);
+}
+
+TEST(test_cholesky_decompose_identity) {
+    double A[] = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+
+    int status = fc_mat_cholesky_decompose_f64(3, A, 3);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Identity should remain identity */
+    ASSERT_TRUE(double_equals(A[0], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[4], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[8], 1.0, TEST_EPSILON));
+}
+
+TEST(test_cholesky_decompose_not_positive_def) {
+    /* Not positive definite (negative eigenvalue) */
+    double A[] = {
+        1.0, 2.0, 3.0,
+        2.0, 1.0, 4.0,
+        3.0, 4.0, 1.0
+    };
+
+    int status = fc_mat_cholesky_decompose_f64(3, A, 3);
+    ASSERT_EQ(status, FC_ERR_NOT_POSITIVE_DEF);
+}
+
+TEST(test_cholesky_decompose_invalid_args) {
+    double A[9];
+
+    ASSERT_EQ(fc_mat_cholesky_decompose_f64(3, NULL, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_cholesky_decompose_f64(0, A, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_cholesky_decompose_f64(-1, A, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_cholesky_decompose_f64(3, A, 2), FC_ERR_INVALID_ARG);
+}
+
+/*
+ * Linear system solver tests
+*/
+
+TEST(test_solve_linear_basic) {
+    /* Solve A*x = b where A is 3x3 */
+    double A[] = {
+        2.0, 1.0, 1.0,
+        4.0, 3.0, 3.0,
+        8.0, 7.0, 9.0
+    };
+    double b[] = {4.0, 10.0, 24.0};
+
+    int status = fc_mat_solve_linear_f64(3, 1, A, 3, b, 1);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Solution should be [1, 1, 1] */
+    ASSERT_TRUE(double_equals(b[0], 1.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(b[1], 1.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(b[2], 1.0, TEST_EPSILON_RELAXED));
+}
+
+TEST(test_solve_linear_identity) {
+    double A[] = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+    double b[] = {3.0, 5.0, 7.0};
+
+    int status = fc_mat_solve_linear_f64(3, 1, A, 3, b, 1);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Solution should be b itself */
+    ASSERT_TRUE(double_equals(b[0], 3.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(b[1], 5.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(b[2], 7.0, TEST_EPSILON));
+}
+
+TEST(test_solve_linear_multiple_rhs) {
+    /* Solve A*X = B where B has 2 columns */
+    double A[] = {
+        2.0, 1.0,
+        1.0, 3.0
+    };
+    /* B is stored in row-major order with ldb=2 (2 columns) */
+    /* For solution X = [[1, 2], [2, 3]], B = A*X = [[4, 7], [7, 11]] */
+    double B[] = {
+        4.0, 7.0,   /* First row */
+        7.0, 11.0   /* Second row */
+    };
+
+    int status = fc_mat_solve_linear_f64(2, 2, A, 2, B, 2);
+    ASSERT_EQ(status, FC_OK);
+
+    /* First solution should be [1, 2] (column 0) */
+    ASSERT_TRUE(double_equals(B[0], 1.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(B[2], 2.0, TEST_EPSILON_RELAXED));
+
+    /* Second solution should be [2, 3] (column 1) */
+    ASSERT_TRUE(double_equals(B[1], 2.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(B[3], 3.0, TEST_EPSILON_RELAXED));
+}
+
+TEST(test_solve_linear_invalid_args) {
+    double A[4], b[2];
+
+    ASSERT_EQ(fc_mat_solve_linear_f64(2, 1, NULL, 2, b, 1), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_solve_linear_f64(2, 1, A, 2, NULL, 1), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_solve_linear_f64(0, 1, A, 2, b, 1), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_solve_linear_f64(2, 0, A, 2, b, 1), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_solve_linear_f64(2, 1, A, 1, b, 1), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_solve_linear_f64(2, 1, A, 2, b, 0), FC_ERR_INVALID_ARG);
+}
+
+TEST(test_inverse_basic) {
+    /* Invert a 3x3 matrix */
+    double A[] = {
+        2.0, 1.0, 1.0,
+        4.0, 3.0, 3.0,
+        8.0, 7.0, 9.0
+    };
+    double A_orig[9];
+    memcpy(A_orig, A, sizeof(A));
+
+    int status = fc_mat_inverse_f64(3, A, 3);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Verify A * A_inv = I */
+    double result[9] = {0};
+    gemm_reference(3, 3, 3, 1.0, A_orig, 3, A, 3, 0.0, result, 3);
+
+    /* Check diagonal elements are 1 */
+    ASSERT_TRUE(double_equals(result[0], 1.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(result[4], 1.0, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(result[8], 1.0, TEST_EPSILON_RELAXED));
+
+    /* Check off-diagonal elements are 0 */
+    ASSERT_TRUE(fabs(result[1]) < TEST_EPSILON_RELAXED);
+    ASSERT_TRUE(fabs(result[2]) < TEST_EPSILON_RELAXED);
+    ASSERT_TRUE(fabs(result[3]) < TEST_EPSILON_RELAXED);
+}
+
+TEST(test_inverse_identity) {
+    double A[] = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+
+    int status = fc_mat_inverse_f64(3, A, 3);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Identity inverse is identity */
+    ASSERT_TRUE(double_equals(A[0], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[4], 1.0, TEST_EPSILON));
+    ASSERT_TRUE(double_equals(A[8], 1.0, TEST_EPSILON));
+}
+
+TEST(test_inverse_2x2) {
+    /* Simple 2x2 matrix */
+    double A[] = {
+        4.0, 7.0,
+        2.0, 6.0
+    };
+
+    int status = fc_mat_inverse_f64(2, A, 2);
+    ASSERT_EQ(status, FC_OK);
+
+    /* Expected inverse: [0.6, -0.7; -0.2, 0.4] */
+    ASSERT_TRUE(double_equals(A[0], 0.6, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(A[1], -0.7, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(A[2], -0.2, TEST_EPSILON_RELAXED));
+    ASSERT_TRUE(double_equals(A[3], 0.4, TEST_EPSILON_RELAXED));
+}
+
+TEST(test_inverse_invalid_args) {
+    double A[9];
+
+    ASSERT_EQ(fc_mat_inverse_f64(3, NULL, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_inverse_f64(0, A, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_inverse_f64(-1, A, 3), FC_ERR_INVALID_ARG);
+    ASSERT_EQ(fc_mat_inverse_f64(3, A, 2), FC_ERR_INVALID_ARG);
+}
+
+/*
  * Test suite registration
 */
 
@@ -2301,4 +2607,27 @@ void register_matrix_tests(void) {
     RUN_TEST(test_gemm_precision_64x64);
     RUN_TEST(test_gemm_precision_128x128);
     RUN_TEST(test_gemm_precision_large_values);
+
+    /* Matrix decomposition tests */
+    RUN_TEST(test_lu_decompose_basic);
+    RUN_TEST(test_lu_decompose_identity);
+    RUN_TEST(test_lu_decompose_singular);
+    RUN_TEST(test_lu_decompose_invalid_args);
+    RUN_TEST(test_qr_decompose_basic);
+    RUN_TEST(test_qr_decompose_tall);
+    RUN_TEST(test_qr_decompose_invalid_args);
+    RUN_TEST(test_cholesky_decompose_basic);
+    RUN_TEST(test_cholesky_decompose_identity);
+    RUN_TEST(test_cholesky_decompose_not_positive_def);
+    RUN_TEST(test_cholesky_decompose_invalid_args);
+
+    /* Linear system solver tests */
+    RUN_TEST(test_solve_linear_basic);
+    RUN_TEST(test_solve_linear_identity);
+    RUN_TEST(test_solve_linear_multiple_rhs);
+    RUN_TEST(test_solve_linear_invalid_args);
+    RUN_TEST(test_inverse_basic);
+    RUN_TEST(test_inverse_identity);
+    RUN_TEST(test_inverse_2x2);
+    RUN_TEST(test_inverse_invalid_args);
 }

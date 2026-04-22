@@ -9,6 +9,8 @@ set(MATRIX_SOURCES
     gemm_dispatch.c
     gemv.c
     transpose.c
+    decompose.c
+    solve.c
 )
 
 # Create object library for matrix module
