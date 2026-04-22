@@ -46,13 +46,6 @@ static void fill_random_matrix(double* mat, int rows, int cols, int ld,
     }
 }
 
-/* Fill vector with random values */
-static void fill_random_vector(double* vec, int n, double min, double max) {
-    for (int i = 0; i < n; i++) {
-        vec[i] = rand_double(min, max);
-    }
-}
-
 /* Compare two matrices with tolerance */
 static int matrices_equal(const double* A, const double* B,
                           int rows, int cols, int ld_a, int ld_b,
@@ -65,24 +58,6 @@ static int matrices_equal(const double* A, const double* B,
         }
     }
     return 1;
-}
-
-/* Naive GEMM for reference (C = alpha*A*B + beta*C) */
-static void gemm_reference(int m, int n, int k,
-                           double alpha,
-                           const double* A, int lda,
-                           const double* B, int ldb,
-                           double beta,
-                           double* C, int ldc) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            double sum = 0.0;
-            for (int p = 0; p < k; p++) {
-                sum += A[i * lda + p] * B[p * ldb + j];
-            }
-            C[i * ldc + j] = alpha * sum + beta * C[i * ldc + j];
-        }
-    }
 }
 
 /*

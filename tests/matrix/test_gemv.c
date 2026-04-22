@@ -53,38 +53,6 @@ static void fill_random_vector(double* vec, int n, double min, double max) {
     }
 }
 
-/* Compare two matrices with tolerance */
-static int matrices_equal(const double* A, const double* B,
-                          int rows, int cols, int ld_a, int ld_b,
-                          double epsilon) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            if (!double_equals(A[i * ld_a + j], B[i * ld_b + j], epsilon)) {
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
-/* Naive GEMM for reference (C = alpha*A*B + beta*C) */
-static void gemm_reference(int m, int n, int k,
-                           double alpha,
-                           const double* A, int lda,
-                           const double* B, int ldb,
-                           double beta,
-                           double* C, int ldc) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            double sum = 0.0;
-            for (int p = 0; p < k; p++) {
-                sum += A[i * lda + p] * B[p * ldb + j];
-            }
-            C[i * ldc + j] = alpha * sum + beta * C[i * ldc + j];
-        }
-    }
-}
-
 /*
  * Vector operations tests
 */

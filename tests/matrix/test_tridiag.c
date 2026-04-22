@@ -95,7 +95,7 @@ TEST(test_tridiag_solve_multi) {
 /* Test tridiagonal solve with invalid arguments */
 TEST(test_tridiag_solve_invalid_args) {
     int64_t n = 3;
-    double a[3], b[3], c[3], d[3], x[3];
+    double a[3] = {0}, b[3] = {0}, c[3] = {0}, d[3] = {0}, x[3] = {0};
 
     /* NULL pointers */
     ASSERT_EQ(fc_mat_tridiag_solve_f64(n, NULL, b, c, d, x), FC_ERR_INVALID_ARG);

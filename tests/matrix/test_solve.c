@@ -30,43 +30,6 @@ static int double_equals(double a, double b, double epsilon) {
     return fabs(a - b) < epsilon;
 }
 
-/* Generate random double in range [min, max] */
-static double rand_double(double min, double max) {
-    double scale = rand() / (double)RAND_MAX;
-    return min + scale * (max - min);
-}
-
-/* Fill matrix with random values */
-static void fill_random_matrix(double* mat, int rows, int cols, int ld,
-                                double min, double max) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            mat[i * ld + j] = rand_double(min, max);
-        }
-    }
-}
-
-/* Fill vector with random values */
-static void fill_random_vector(double* vec, int n, double min, double max) {
-    for (int i = 0; i < n; i++) {
-        vec[i] = rand_double(min, max);
-    }
-}
-
-/* Compare two matrices with tolerance */
-static int matrices_equal(const double* A, const double* B,
-                          int rows, int cols, int ld_a, int ld_b,
-                          double epsilon) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            if (!double_equals(A[i * ld_a + j], B[i * ld_b + j], epsilon)) {
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
 /* Naive GEMM for reference (C = alpha*A*B + beta*C) */
 static void gemm_reference(int m, int n, int k,
                            double alpha,

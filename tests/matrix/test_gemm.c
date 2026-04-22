@@ -46,13 +46,6 @@ static void fill_random_matrix(double* mat, int rows, int cols, int ld,
     }
 }
 
-/* Fill vector with random values */
-static void fill_random_vector(double* vec, int n, double min, double max) {
-    for (int i = 0; i < n; i++) {
-        vec[i] = rand_double(min, max);
-    }
-}
-
 /* Compare two matrices with tolerance */
 static int matrices_equal(const double* A, const double* B,
                           int rows, int cols, int ld_a, int ld_b,
