@@ -88,6 +88,67 @@ int fc_mat_qr_decompose_f64(int64_t m, int64_t n, double* A, int64_t lda, double
  */
 int fc_mat_cholesky_decompose_f64(int64_t n, double* A, int64_t lda);
 
+/**
+ * @brief Singular Value Decomposition (SVD)
+ *
+ * Computes: A = U * Sigma * V^T
+ * where A is m×n, U is m×m orthogonal, Sigma is m×n diagonal (singular values),
+ * V is n×n orthogonal
+ *
+ * Implementation: Uses eigenvalue decomposition of A^T*A (for m>=n) or A*A^T (for m<n).
+ * This approach is simpler and more maintainable than Golub-Kahan bidiagonalization,
+ * with acceptable numerical stability for well-conditioned matrices.
+ *
+ * Singular values are returned in descending order: s[0] >= s[1] >= ... >= s[min(m,n)-1] >= 0
+ *
+ * Time complexity: O(min(m,n)^3) dominated by eigenvalue decomposition
+ * Space complexity: O(m*m + n*n) for U and V matrices
+ * Thread safety: Thread-safe (no shared state)
+ *
+ * @param[in]    m      Number of rows in A (must be > 0)
+ * @param[in]    n      Number of columns in A (must be > 0)
+ * @param[inout] A      Input matrix (m×n, row-major), destroyed on output
+ * @param[in]    lda    Leading dimension of A (stride, typically n)
+ * @param[out]   s      Singular values (length min(m,n)), in descending order
+ * @param[out]   U      Left singular vectors (m×m, row-major), can be NULL if not needed
+ * @param[in]    ldu    Leading dimension of U (stride, typically m)
+ * @param[out]   VT     Right singular vectors transposed (n×n, row-major), can be NULL if not needed
+ * @param[in]    ldvt   Leading dimension of VT (stride, typically n)
+ *
+ * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid,
+ *         FC_ERR_OUT_OF_MEMORY if memory allocation fails
+ */
+int fc_mat_svd_f64(int64_t m, int64_t n, double* A, int64_t lda,
+                   double* s, double* U, int64_t ldu, double* VT, int64_t ldvt);
+
+/**
+ * @brief Eigenvalue decomposition for symmetric matrices
+ *
+ * Computes: A = Q * Lambda * Q^T
+ * where A is n×n symmetric, Q is n×n orthogonal (eigenvectors),
+ * Lambda is n×n diagonal (eigenvalues)
+ *
+ * Uses the QR algorithm with implicit shifts.
+ * Only the lower triangle of A is accessed.
+ * Eigenvalues are returned in ascending order.
+ *
+ * Time complexity: O(n^3)
+ * Space complexity: O(n^2) for eigenvector matrix
+ * Thread safety: Thread-safe (no shared state)
+ *
+ * @param[in]    n      Matrix dimension (must be > 0)
+ * @param[inout] A      Input symmetric matrix (n×n, row-major), destroyed on output
+ * @param[in]    lda    Leading dimension of A (stride, typically n)
+ * @param[out]   w      Eigenvalues (length n), in ascending order
+ * @param[out]   Q      Eigenvectors (n×n, row-major), column i is eigenvector for w[i]
+ * @param[in]    ldq    Leading dimension of Q (stride, typically n)
+ *
+ * @return FC_OK on success, FC_ERR_INVALID_ARG if inputs invalid,
+ *         FC_ERR_CONVERGENCE if iteration fails to converge
+ */
+int fc_mat_eig_sym_f64(int64_t n, double* A, int64_t lda,
+                       double* w, double* Q, int64_t ldq);
+
 #ifdef __cplusplus
 }
 #endif
