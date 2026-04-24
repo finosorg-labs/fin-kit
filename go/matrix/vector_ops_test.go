@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"fin-kit/platform"
+	"github.com/finos-org-labs/platform"
 )
 
 const epsilon = 1e-9

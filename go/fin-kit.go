@@ -9,7 +9,8 @@ package fin_kit
 
 import (
 	"fin-kit/matrix"
-	"fin-kit/platform"
+
+	"github.com/finos-org-labs/platform"
 )
 
 // Version information

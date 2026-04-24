@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include "test_framework.h"
 #include <matrix/matrix.h>
-#include <platform/error.h>
-#include <platform/simd_detect.h>
+#include <error.h>
+#include <simd_detect.h>
 #include <matrix/matrix_internal.h>
 
 /* Test tolerance for floating-point comparisons */

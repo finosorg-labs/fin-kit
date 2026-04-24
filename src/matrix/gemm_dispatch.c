@@ -11,8 +11,8 @@
  */
 
 #include <matrix/matrix.h>
-#include <platform/simd_detect.h>
-#include <platform/error.h>
+#include <simd_detect.h>
+#include <error.h>
 
 #include <limits.h>
 

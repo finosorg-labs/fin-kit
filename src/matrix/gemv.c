@@ -15,9 +15,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
-#include <platform/platform.h>
-#include <platform/error.h>
-#include <platform/simd_detect.h>
+#include <platform.h>
+#include <error.h>
+#include <simd_detect.h>
 #include <matrix/matrix_internal.h>
 
 /* Cache blocking parameters */

@@ -9,8 +9,8 @@
 
 #include "bench_framework.h"
 #include <codec/fix_codec.h>
-#include <platform/simd_detect.h>
-#include <platform/platform.h>
+#include <simd_detect.h>
+#include <platform.h>
 
 #include <stdlib.h>
 #include <string.h>

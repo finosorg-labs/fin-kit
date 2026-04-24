@@ -12,10 +12,11 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "test_framework.h"
 #include <matrix/matrix.h>
-#include <platform/error.h>
-#include <platform/simd_detect.h>
+#include <error.h>
+#include <simd_detect.h>
 #include <matrix/matrix_internal.h>
 
 /* Test tolerance for floating-point comparisons */
@@ -545,9 +546,9 @@ TEST(test_eig_sym_reconstruction) {
         }
 
         /* Debug: print verification */
-        printf("  Eigenpair %ld: lambda=%.6f\n", i, w[i]);
+        printf("  Eigenpair %" PRId64 ": lambda=%.6f\n", i, w[i]);
         for (int64_t j = 0; j < 3; j++) {
-            printf("    A*v[%ld]=%.6f, lambda*v[%ld]=%.6f, diff=%.2e\n",
+            printf("    A*v[%" PRId64 "]=%.6f, lambda*v[%" PRId64 "]=%.6f, diff=%.2e\n",
                    j, Av[j], j, w[i] * v[j], fabs(Av[j] - w[i] * v[j]));
         }
 

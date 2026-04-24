@@ -8,7 +8,7 @@
 #ifndef FC_SOLVE_H
 #define FC_SOLVE_H
 
-#include <version.h>
+#include "version.h"
 #include <stddef.h>
 #include <stdint.h>
 

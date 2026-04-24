@@ -66,6 +66,7 @@ option(FC_BUILD_TESTS "Build tests" ON)
 option(FC_BUILD_BENCHMARKS "Build benchmarks" ON)
 option(FC_BUILD_SHARED "Build shared library" OFF)
 option(FC_ENABLE_SANITIZERS "Enable sanitizers (Debug only)" OFF)
+option(FC_USE_PREBUILT_MODULES "Use prebuilt libraries from submodules instead of building from source" OFF)
 
 # Sanitizer configuration
 if(FC_ENABLE_SANITIZERS)
@@ -97,71 +98,79 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerFlags.cmake)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerFlags.cmake)
 endif()
 
-# Platform abstraction layer (populated in W2)
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/platform)
-    add_subdirectory(src/platform)
-endif()
+# Helper macro to add module (prebuilt from submodule or source)
+macro(add_fin_module MODULE_NAME MODULE_PATH)
+    # Check if this is a submodule (path starts with core/) or main project module (path starts with src/)
+    string(SUBSTRING ${MODULE_PATH} 0 5 _path_prefix)
+
+    if(FC_USE_PREBUILT_MODULES AND _path_prefix STREQUAL "core/")
+        # Use prebuilt library from submodule build directory
+        # Try platform-specific directory first, then fall back to build root
+        set(_module_lib_with_dir "${CMAKE_CURRENT_SOURCE_DIR}/core/${MODULE_NAME}/build/${_platform_dir}/libfinkit_${MODULE_NAME}_static.a")
+        set(_module_lib_root "${CMAKE_CURRENT_SOURCE_DIR}/core/${MODULE_NAME}/build/libfinkit_${MODULE_NAME}_static.a")
+
+        if(EXISTS ${_module_lib_with_dir})
+            set(_module_lib ${_module_lib_with_dir})
+        elseif(EXISTS ${_module_lib_root})
+            set(_module_lib ${_module_lib_root})
+        else()
+            message(WARNING "Prebuilt ${MODULE_NAME} library not found, skipping. Tried:\n  ${_module_lib_with_dir}\n  ${_module_lib_root}")
+            return()
+        endif()
+
+        add_library(finkit_${MODULE_NAME} STATIC IMPORTED)
+        set_target_properties(finkit_${MODULE_NAME} PROPERTIES
+            IMPORTED_LOCATION ${_module_lib}
+            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/core/${MODULE_NAME}/include"
+        )
+        message(STATUS "Using prebuilt ${MODULE_NAME} library: ${_module_lib}")
+    else()
+        # Build from source (either FC_USE_PREBUILT_MODULES=OFF or this is a main project module)
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${MODULE_PATH})
+            add_subdirectory(${MODULE_PATH})
+        endif()
+    endif()
+endmacro()
 
 # Module libraries (populated in subsequent phases)
+# M00 Platform (base layer)
+add_fin_module(platform core/platform)
+
 # M01 Matrix
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/matrix)
-    add_subdirectory(src/matrix)
-endif()
+add_fin_module(matrix src/matrix)
 
 # M02 Statistics
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/stats)
-    add_subdirectory(src/stats)
-endif()
+add_fin_module(stats src/stats)
 
 # M03 Sorting
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/sort)
-    add_subdirectory(src/sort)
-endif()
+add_fin_module(sort src/sort)
 
 # M04 Math functions
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/math_funcs)
-    add_subdirectory(src/math_funcs)
-endif()
+add_fin_module(math_funcs src/math_funcs)
 
 # M05 Random number generation
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/random)
-    add_subdirectory(src/random)
-endif()
+add_fin_module(random src/random)
 
 # M06 Codec
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/codec)
-    add_subdirectory(src/codec)
-endif()
+add_fin_module(codec src/codec)
 
 # M07 Data structures
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/ds)
-    add_subdirectory(src/ds)
-endif()
+add_fin_module(ds src/ds)
 
 # M08 Hash
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/hash)
-    add_subdirectory(src/hash)
-endif()
+add_fin_module(hash src/hash)
 
 # M09 String operations
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/string_ops)
-    add_subdirectory(src/string_ops)
-endif()
+add_fin_module(string_ops src/string_ops)
 
 # M10 Optimization
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/optim)
-    add_subdirectory(src/optim)
-endif()
+add_fin_module(optim src/optim)
 
 # M11 Crypto trading
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto_trading)
-    add_subdirectory(src/crypto_trading)
-endif()
+add_fin_module(crypto_trading src/crypto_trading)
 
 # M12 Exchange
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/exchange)
-    add_subdirectory(src/exchange)
-endif()
+add_fin_module(exchange src/exchange)
 
 # Test suite
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests AND FC_BUILD_TESTS)
@@ -206,7 +215,13 @@ foreach(_mod IN LISTS ALL_MODULES)
 endforeach()
 
 # Collect all object libraries
-set(ALL_OBJECTS $<TARGET_OBJECTS:finkit_platform>)
+set(ALL_OBJECTS "")
+if(TARGET finkit_platform)
+    get_target_property(_platform_type finkit_platform TYPE)
+    if(_platform_type STREQUAL "OBJECT_LIBRARY")
+        list(APPEND ALL_OBJECTS $<TARGET_OBJECTS:finkit_platform>)
+    endif()
+endif()
 if(TARGET matrix_obj)
     list(APPEND ALL_OBJECTS $<TARGET_OBJECTS:matrix_obj>)
 endif()
@@ -225,26 +240,41 @@ if(ALL_EXPORTS)
         $<INSTALL_INTERFACE:include>
     )
     target_compile_definitions(finkit PRIVATE FC_STATIC_BUILD)
-    target_link_libraries(finkit PUBLIC m)
+
+    # Link platform library (either built from source or prebuilt)
+    if(TARGET finkit_platform)
+        target_link_libraries(finkit PRIVATE finkit_platform m)
+    else()
+        target_link_libraries(finkit PRIVATE m)
+    endif()
 
     # Install library and register the export set first (creates "fin-kit-targets")
-    install(TARGETS finkit
-        EXPORT fin-kit-targets
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-    )
+    # Only export if using prebuilt modules (to avoid export set conflicts with submodules)
+    if(FC_USE_PREBUILT_MODULES)
+        install(TARGETS finkit
+            EXPORT fin-kit-targets
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
 
-    # Then export for build-tree consumers (find_package from build dir)
-    export(EXPORT fin-kit-targets
-        FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
-        NAMESPACE ${PROJECT_NAME}::
-    )
+        # Then export for build-tree consumers (find_package from build dir)
+        export(EXPORT fin-kit-targets
+            FILE "${CMAKE_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
+            NAMESPACE ${PROJECT_NAME}::
+        )
 
-    install(EXPORT fin-kit-targets
-        FILE fin-kitTargets.cmake
-        NAMESPACE ${PROJECT_NAME}::
-        DESTINATION lib/cmake/${PROJECT_NAME}
-    )
+        install(EXPORT fin-kit-targets
+            FILE fin-kitTargets.cmake
+            NAMESPACE ${PROJECT_NAME}::
+            DESTINATION lib/cmake/${PROJECT_NAME}
+        )
+    else()
+        # In source build mode, just install the library without export
+        install(TARGETS finkit
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+        )
+    endif()
 endif()
 
 # Install configuration

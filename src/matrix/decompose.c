@@ -10,9 +10,9 @@
 #include <string.h>
 #include <float.h>
 #include <matrix/matrix.h>
-#include <platform/platform.h>
-#include <platform/error.h>
-#include <platform/mem_aligned.h>
+#include <platform.h>
+#include <error.h>
+#include <mem_aligned.h>
 
 /*
  * Helper functions

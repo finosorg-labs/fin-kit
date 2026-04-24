@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-#include <platform/platform.h>
+#include <platform.h>
 
 /*
  * Test framework configuration

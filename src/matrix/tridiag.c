@@ -10,9 +10,9 @@
 #include <string.h>
 #include <float.h>
 #include <matrix/tridiag.h>
-#include <platform/platform.h>
-#include <platform/error.h>
-#include <platform/mem_aligned.h>
+#include <platform.h>
+#include <error.h>
+#include <mem_aligned.h>
 
 /**
  * @brief Solve tridiagonal system using Thomas algorithm

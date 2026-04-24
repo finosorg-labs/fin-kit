@@ -10,7 +10,7 @@
 
 #include "test_framework.h"
 #include <matrix/tridiag.h>
-#include <platform/error.h>
+#include <error.h>
 
 /* Test tolerance */
 #define TEST_EPSILON 1e-10

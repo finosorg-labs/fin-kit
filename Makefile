@@ -1,12 +1,15 @@
 # fin-kit Makefile
 #
 # Build Targets:
-#   make           build Linux native (default)
-#   make linux     build Linux native
-#   make windows   cross-compile Windows amd64
-#   make all       build Linux + Windows + Go
-#   make test      run tests (C + Go + coverage)
-#   make bench     run benchmarks (C + Go)
+#   make              build Linux native with prebuilt modules (default)
+#   make linux        build Linux native with prebuilt modules
+#   make linux-source build Linux native from source (no prebuilt)
+#   make windows      cross-compile Windows amd64 with prebuilt modules
+#   make windows-source cross-compile Windows amd64 from source
+#   make all          build Linux + Windows + Go
+#   make source
+#   make test         run tests (C + Go + coverage)
+#   make bench        run benchmarks (C + Go)
 #
 # QA Targets:
 #   make qa                run all QA checks (sanitizers + static analysis)
@@ -28,6 +31,9 @@
 #   make verify    verify artifact formats
 #   make clean     remove all build artifacts
 #   make help      show detailed help
+#
+# Submodule Targets:
+#   make sync              sync all submodules (init + remote update + restore tracked files)
 #
 # Output structure:
 #   build/linux_amd64/{bin,lib}/
@@ -57,6 +63,15 @@ LINUX_CONFIG := -G Ninja \
 	-DCMAKE_C_FLAGS="-fprofile-arcs -ftest-coverage" \
 	-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage" \
 	-DFC_BUILD_TESTS=ON \
+	-DFC_BUILD_BENCHMARKS=$(shell [ "$(BUILD_TYPE)" = "Release" ] && echo ON || echo OFF) \
+	-DFC_USE_PREBUILT_MODULES=ON
+
+LINUX_SOURCE_CONFIG := -G Ninja \
+	-B $(LINUX_BUILD_DIR) \
+	-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+	-DCMAKE_C_FLAGS="-fprofile-arcs -ftest-coverage" \
+	-DCMAKE_EXE_LINKER_FLAGS="-fprofile-arcs -ftest-coverage" \
+	-DFC_BUILD_TESTS=ON \
 	-DFC_BUILD_BENCHMARKS=$(shell [ "$(BUILD_TYPE)" = "Release" ] && echo ON || echo OFF)
 
 WINDOWS_CONFIG := -G "Unix Makefiles" \
@@ -65,18 +80,31 @@ WINDOWS_CONFIG := -G "Unix Makefiles" \
 	-DCMAKE_MAKE_PROGRAM=/usr/bin/make \
 	-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 	-DFC_BUILD_TESTS=ON \
-	-DFC_BUILD_BENCHMARKS=ON
+	-DFC_BUILD_BENCHMARKS=ON \
+	-DFC_USE_PREBUILT_MODULES=ON
+
+WINDOWS_SOURCE_CONFIG := -G "Unix Makefiles" \
+	-B $(WINDOWS_BUILD_DIR) \
+	-DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN_DIR)/x86_64-w64-mingw32.cmake \
+	-DCMAKE_MAKE_PROGRAM=/usr/bin/make \
+	-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+	-DFC_BUILD_TESTS=ON \
+	-DFC_BUILD_BENCHMARKS=ON \
+	-DFC_USE_PREBUILT_MODULES=OFF
 
 LINUX_ARTIFACT_DIR    := $(LINUX_BUILD_DIR)/bin
 WINDOWS_ARTIFACT_DIR  := $(WINDOWS_BUILD_DIR)/bin
 
-.PHONY: all default linux windows go test bench clean verify help
+.PHONY: all default linux linux-source windows windows-source go test bench clean verify help
 .PHONY: qa qa-sanitizers qa-static
 .PHONY: sanitizer-asan sanitizer-usan sanitizer-tsan sanitizer-msan clang-tidy cppcheck
+.PHONY: sync
 
 default: linux
 
 all: linux windows go
+
+source: linux-source windows-source go
 
 qa: qa-sanitizers qa-static
 	@echo "==> All QA checks completed"
@@ -88,13 +116,23 @@ qa-static: clang-tidy cppcheck
 	@echo "==> All static analysis checks completed"
 
 linux:
-	@echo "==> Building Linux (native, $(BUILD_TYPE))"
+	@echo "==> Building Linux (native, $(BUILD_TYPE), prebuilt modules)"
 	$(CMAKE) $(LINUX_CONFIG)
 	$(CMAKE) --build $(LINUX_BUILD_DIR) --parallel
 
+linux-source:
+	@echo "==> Building Linux (native, $(BUILD_TYPE), from source)"
+	$(CMAKE) $(LINUX_SOURCE_CONFIG)
+	$(CMAKE) --build $(LINUX_BUILD_DIR) --parallel
+
 windows:
-	@echo "==> Building Windows amd64 (cross-compile, $(BUILD_TYPE))"
+	@echo "==> Building Windows amd64 (cross-compile, $(BUILD_TYPE), prebuilt modules)"
 	$(CMAKE) $(WINDOWS_CONFIG)
+	$(CMAKE) --build $(WINDOWS_BUILD_DIR) --parallel
+
+windows-source:
+	@echo "==> Building Windows amd64 (cross-compile, $(BUILD_TYPE), from source)"
+	$(CMAKE) $(WINDOWS_SOURCE_CONFIG)
 	$(CMAKE) --build $(WINDOWS_BUILD_DIR) --parallel
 
 go:
@@ -212,6 +250,12 @@ cppcheck:
 		--quiet \
 		src/ tests/ benchmarks/ include/ 2>&1 | grep -v "^nofile:0:0: information:" || true
 
+sync:
+	@echo "==> Syncing all submodules (init + remote update + restore tracked files)"
+	git submodule foreach --recursive 'git reset --hard && git clean -fd'
+	git submodule update --init --remote --merge --recursive --force
+	@echo "==> Submodules synced successfully"
+
 clean:
 	rm -rf build
 
@@ -219,11 +263,13 @@ help:
 	@echo "fin-kit Makefile" && \
 	echo "" && \
 	echo "Build targets:" && \
-	echo "  make          build Linux native" && \
-	echo "  make linux    build Linux native" && \
-	echo "  make windows  cross-compile Windows amd64" && \
-	echo "  make all      build Linux + Windows + Go" && \
-	echo "  make go       build Go module" && \
+	echo "  make              build Linux native with prebuilt modules (default)" && \
+	echo "  make linux        build Linux native with prebuilt modules" && \
+	echo "  make linux-source build Linux native from source (no prebuilt)" && \
+	echo "  make windows      cross-compile Windows amd64 with prebuilt modules" && \
+	echo "  make windows-source cross-compile Windows amd64 from source" && \
+	echo "  make all          build Linux + Windows + Go" && \
+	echo "  make go           build Go module" && \
 	echo "" && \
 	echo "Test targets:" && \
 	echo "  make test     run tests (C + Go + coverage)" && \
@@ -247,6 +293,9 @@ help:
 	echo "Utility targets:" && \
 	echo "  make verify   verify artifact formats" && \
 	echo "  make clean    remove build artifacts" && \
+	echo "" && \
+	echo "Submodule targets:" && \
+	echo "  make sync              sync all submodules (init + remote update + restore tracked files)" && \
 	echo "" && \
 	echo "Options:" && \
 	echo "  BUILD_TYPE=Debug make   build Debug variant" && \

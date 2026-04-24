@@ -4,7 +4,7 @@
  */
 
 #include "bench_framework.h"
-#include <platform/simd_detect.h>
+#include <simd_detect.h>
 #include <stdio.h>
 
 /* External benchmark suites */

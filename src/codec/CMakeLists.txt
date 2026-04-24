@@ -12,6 +12,7 @@ add_library(codec_obj OBJECT ${CODEC_SOURCES})
 
 target_include_directories(codec_obj PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/core/platform/include
 )
 
 # Enable internal tests if building tests

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"fin-kit/platform"
+	"github.com/finos-org-labs/platform"
 )
 
 func TestSolveLinear(t *testing.T) {

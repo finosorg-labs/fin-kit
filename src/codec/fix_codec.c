@@ -10,8 +10,8 @@
  */
 
 #include <codec/fix_codec.h>
-#include <platform/simd_detect.h>
-#include <platform/platform.h>
+#include <simd_detect.h>
+#include <platform.h>
 #include <string.h>
 #include <stdio.h>
 

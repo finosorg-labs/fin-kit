@@ -1,20 +1,37 @@
-*~
+# Build directories - only keep library files (.a/.so/.dylib/.lib/.dll)
+build/**
+!build/**/
+!build/**/*.a
+!build/**/*.so
+!build/**/*.dylib
+!build/**/*.lib
+!build/**/*.dll
+build-*/
+install/
+
+# Go
+*.test
+*.out
+*.prof
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
-*.exe
-.idea
-vendor
-_test/test
-_test/echo_server
-_test/tmp
-_vendor*
-gen
-.DS_Store
+*~
 
-# CMake build artifacts (platform-specific, do not commit)
-build/
-build-*/
-CMakeFiles/
-cmake_install.cmake
-CTestTestfile.cmake
-compile_commands.json
+# OS
+.DS_Store
+Thumbs.db
+.directory
+
+# CMake
+
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage.out
+
+# Test binaries

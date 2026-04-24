@@ -8,7 +8,7 @@
 #ifndef FC_DECOMPOSE_H
 #define FC_DECOMPOSE_H
 
-#include <version.h>
+#include "version.h"
 #include <stddef.h>
 #include <stdint.h>
 

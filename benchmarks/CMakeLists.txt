@@ -17,6 +17,7 @@ target_include_directories(bench_framework
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
+        ${CMAKE_SOURCE_DIR}/core/platform/include
 )
 
 target_link_libraries(bench_framework
@@ -57,6 +58,7 @@ target_include_directories(finkit_benchmarks
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/core/platform/include
 )
 
 # Compiler flags for benchmarks

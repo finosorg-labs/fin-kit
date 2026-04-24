@@ -19,6 +19,7 @@ add_library(matrix_obj OBJECT ${MATRIX_SOURCES})
 
 target_include_directories(matrix_obj PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/core/platform/include
 )
 
 # Enable internal tests if building tests

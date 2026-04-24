@@ -6,29 +6,10 @@
 package fin_kit
 
 /*
-#cgo CFLAGS: -I../include -I../src -O2 -Wall -std=c11 -D_POSIX_C_SOURCE=200112L
+#cgo CFLAGS: -I../include -I../core/platform/include -I../src -O2 -Wall -std=c11 -D_POSIX_C_SOURCE=200112L
 #cgo LDFLAGS: -lm
 
-#include <platform/platform.h>
-#include <platform/simd_detect.h>
-#include <platform/mem_aligned.h>
-#include <platform/error.h>
 #include <matrix/matrix.h>
-
-// Platform sources
-#include "../src/platform/simd_detect.c"
-#include "../src/platform/mem_aligned.c"
-#include "../src/platform/error.c"
-#include "../src/platform/fc_init.c"
-
-// Platform-specific sources
-#if defined(__linux__)
-  #include "../src/platform/platform_linux.c"
-#elif defined(__APPLE__)
-  #include "../src/platform/platform_macos.c"
-#elif defined(_WIN32)
-  #include "../src/platform/platform_win.c"
-#endif
 
 // Codec sources
 #include "../src/codec/fix_codec.c"

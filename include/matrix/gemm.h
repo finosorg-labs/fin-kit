@@ -9,7 +9,7 @@
 #ifndef FC_GEMM_H
 #define FC_GEMM_H
 
-#include <version.h>
+#include "version.h"
 #include <stddef.h>
 #include <stdint.h>
 

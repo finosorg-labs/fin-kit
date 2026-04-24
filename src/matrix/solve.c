@@ -11,9 +11,9 @@
 #include <float.h>
 #include <stdlib.h>
 #include <matrix/matrix.h>
-#include <platform/platform.h>
-#include <platform/error.h>
-#include <platform/mem_aligned.h>
+#include <platform.h>
+#include <error.h>
+#include <mem_aligned.h>
 
 /*
  * Linear system solver
