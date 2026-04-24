@@ -11,5 +11,6 @@ Checks: '-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
 # - The code follows defensive programming practices with input validation
 
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*'
+# Exclude third_party directory from analysis
+HeaderFilterRegex: '^(?!.*third_party).*$'
 FormatStyle: file

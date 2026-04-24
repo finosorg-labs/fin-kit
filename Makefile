@@ -252,8 +252,21 @@ cppcheck:
 
 sync:
 	@echo "==> Syncing all submodules (init + remote update + restore tracked files)"
-	git submodule foreach --recursive 'git reset --hard && git clean -fd'
-	git submodule update --init --remote --merge --recursive --force
+	@echo "==> Step 1: Sync submodule URLs from .gitmodules to .git/config"
+	@git submodule sync --recursive
+	@echo "==> Step 2: Ensure submodules are registered in git index"
+	@git config -f .gitmodules --get-regexp '^submodule\..*\.path$$' | while read key path; do \
+		if [ ! -d "$$path/.git" ] && [ ! -f "$$path/.git" ]; then \
+			echo "  Restoring submodule: $$path"; \
+			submodule_name=$$(echo $$key | sed 's/^submodule\.\(.*\)\.path$$/\1/'); \
+			url=$$(git config -f .gitmodules --get "submodule.$$submodule_name.url"); \
+			git submodule add -f "$$url" "$$path" 2>/dev/null || true; \
+		fi; \
+	done
+	@echo "==> Step 3: Reset and clean submodule working trees"
+	@git submodule foreach --recursive 'git reset --hard && git clean -fd' || true
+	@echo "==> Step 4: Update all submodules to latest"
+	@git submodule update --init --remote --merge --recursive --force
 	@echo "==> Submodules synced successfully"
 
 clean:

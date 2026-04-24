@@ -30,8 +30,8 @@ echo "Coverage Report - All Modules"
 echo "============================================================"
 echo ""
 
-# Find all core with coverage data
-core=$(find src -name "*.gcda" 2>/dev/null | sed 's|src/\([^/]*\)/.*|\1|' | sort -u)
+# Find all modules with coverage data
+modules=$(find src -name "*.gcda" 2>/dev/null | sed 's|src/\([^/]*\)/.*|\1|' | sort -u)
 
 if [ -z "$modules" ]; then
     echo "No coverage data found. Make sure the build was configured with coverage flags."

@@ -11,9 +11,6 @@ package fin_kit
 
 #include <matrix/matrix.h>
 
-// Codec sources
-#include "../src/codec/fix_codec.c"
-
 // Matrix sources - scalar and dispatch
 #include "../src/matrix/gemm_scalar.c"
 #include "../src/matrix/gemm_dispatch.c"

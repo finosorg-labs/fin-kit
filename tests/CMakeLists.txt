@@ -20,8 +20,6 @@ add_executable(finkit_tests
     matrix/test_solve.c
     matrix/test_tridiag.c
     matrix/test_precision.c
-    codec/test_codec.c
-    codec/test_fix_codec.c
 )
 
 # Link with finkit library (includes all modules)

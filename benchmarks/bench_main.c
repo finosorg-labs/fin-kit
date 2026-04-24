@@ -9,7 +9,6 @@
 
 /* External benchmark suites */
 extern void bench_matrix_run(void);
-extern void bench_codec_run(void);
 
 int main(int argc, char** argv) {
     (void)argc;
@@ -21,7 +20,6 @@ int main(int argc, char** argv) {
     printf("fin-kit performance benchmarks v%s\n", FC_BENCH_VERSION);
 
     bench_matrix_run();
-    bench_codec_run();
 
     fc_bench_cleanup();
     return 0;

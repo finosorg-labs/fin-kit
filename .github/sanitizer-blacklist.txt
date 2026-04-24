@@ -1,0 +1,10 @@
+# Sanitizer blacklist for fin-kit
+# Exclude third-party libraries from sanitizer checks
+
+# Exclude all third_party code
+src:*/third_party/*
+
+# Exclude specific third-party libraries
+src:*/lz4/*
+src:*/xxhash/*
+src:*/zstd/*

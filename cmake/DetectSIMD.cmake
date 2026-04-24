@@ -7,7 +7,11 @@
 
 include(CheckCSourceCompiles)
 
+# Save original flags
+set(_orig_cmake_required_flags "${CMAKE_REQUIRED_FLAGS}")
+
 # Detect SSE4.2
+set(CMAKE_REQUIRED_FLAGS "${_orig_cmake_required_flags} -msse4.2")
 check_c_source_compiles("
     #include <immintrin.h>
     int main() {
@@ -17,6 +21,7 @@ check_c_source_compiles("
 " FC_HAS_SSE42)
 
 # Detect AVX2
+set(CMAKE_REQUIRED_FLAGS "${_orig_cmake_required_flags} -mavx2 -mfma")
 check_c_source_compiles("
     #include <immintrin.h>
     int main() {
@@ -26,6 +31,7 @@ check_c_source_compiles("
 " FC_HAS_AVX2)
 
 # Detect AVX-512
+set(CMAKE_REQUIRED_FLAGS "${_orig_cmake_required_flags} -mavx512f -mavx512dq")
 check_c_source_compiles("
     #include <immintrin.h>
     int main() {
@@ -33,6 +39,9 @@ check_c_source_compiles("
         return _mm512_extract_epi32(a, 0);
     }
 " FC_HAS_AVX512)
+
+# Restore original flags
+set(CMAKE_REQUIRED_FLAGS "${_orig_cmake_required_flags}")
 
 # Determine the highest SIMD level
 if(FC_HAS_AVX512)

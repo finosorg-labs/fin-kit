@@ -87,11 +87,28 @@ endfunction()
 # -----------------------------------------------------------------------------
 if(_COMPILER_IS_GNUC OR _COMPILER_IS_CLANG)
 
+    # Sanitizer blacklist to exclude third-party code (Clang only)
+    set(_BLACKLIST_FLAG "")
+    if(_COMPILER_IS_CLANG)
+        set(_SANITIZER_BLACKLIST "${CMAKE_CURRENT_SOURCE_DIR}/.github/sanitizer-blacklist.txt")
+        if(EXISTS "${_SANITIZER_BLACKLIST}")
+            set(_BLACKLIST_FLAG "-fsanitize-blacklist=${_SANITIZER_BLACKLIST}")
+        endif()
+    endif()
+
     # Compiler flags for each sanitizer type
     set(_ASAN_FLAGS    "-fsanitize=address" "-fno-omit-frame-pointer")
     set(_USAN_FLAGS    "-fsanitize=undefined" "-fno-omit-frame-pointer")
     set(_TSAN_FLAGS    "-fsanitize=thread" "-fno-omit-frame-pointer" "-g")
     set(_MSAN_FLAGS    "-fsanitize=memory" "-fno-omit-frame-pointer" "-fsanitize-memory-track-origins=2")
+
+    # Add blacklist flag if available
+    if(_BLACKLIST_FLAG)
+        list(APPEND _ASAN_FLAGS ${_BLACKLIST_FLAG})
+        list(APPEND _USAN_FLAGS ${_BLACKLIST_FLAG})
+        list(APPEND _TSAN_FLAGS ${_BLACKLIST_FLAG})
+        list(APPEND _MSAN_FLAGS ${_BLACKLIST_FLAG})
+    endif()
 
     # Build combined flags
     set(_all_flags "")

@@ -10,7 +10,6 @@
 
 /* External test registration functions */
 extern void register_matrix_tests(void);
-extern void register_codec_tests(void);
 
 int main(int argc, char** argv) {
     /* Initialize fin-kit library */
@@ -21,7 +20,6 @@ int main(int argc, char** argv) {
 
     /* Register all test suites */
     register_matrix_tests();
-    register_codec_tests();
 
     int result = fc_test_run_all();
 

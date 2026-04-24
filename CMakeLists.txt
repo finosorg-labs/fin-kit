@@ -78,6 +78,26 @@ endif()
 # Third-party libraries (populated in W3)
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/CMakeLists.txt)
     add_subdirectory(third_party)
+
+    # For GCC: Remove sanitizer flags from third_party targets
+    # (Clang uses blacklist, but GCC doesn't support it)
+    if(FC_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "GNU")
+        foreach(_target finkit_3rdparty_lz4 finkit_3rdparty_xxhash finkit_3rdparty_zstd)
+            if(TARGET ${_target})
+                get_target_property(_compile_opts ${_target} COMPILE_OPTIONS)
+                if(_compile_opts)
+                    list(FILTER _compile_opts EXCLUDE REGEX "fsanitize")
+                    set_target_properties(${_target} PROPERTIES COMPILE_OPTIONS "${_compile_opts}")
+                endif()
+
+                get_target_property(_link_opts ${_target} LINK_OPTIONS)
+                if(_link_opts)
+                    list(FILTER _link_opts EXCLUDE REGEX "fsanitize")
+                    set_target_properties(${_target} PROPERTIES LINK_OPTIONS "${_link_opts}")
+                endif()
+            endif()
+        endforeach()
+    endif()
 else()
     message(STATUS "third_party/: CMakeLists.txt will be added in W3")
 endif()
@@ -136,7 +156,25 @@ endmacro()
 # M00 Platform (base layer)
 add_fin_module(platform core/platform)
 
-# M01 Matrix
+# M06 Codec (depends on platform, so tell it platform is already available)
+# Note: Codec submodule only supports prebuilt libraries, not source builds
+if(NOT FC_USE_PREBUILT_MODULES)
+    set(FC_PLATFORM_ALREADY_ADDED TRUE)
+    # Force codec to use prebuilt even when other modules build from source
+    set(_codec_lib "${CMAKE_CURRENT_SOURCE_DIR}/core/codec/build/${_platform_dir}/libfinkit_codec_static.a")
+    if(EXISTS ${_codec_lib})
+        add_library(finkit_codec STATIC IMPORTED)
+        set_target_properties(finkit_codec PROPERTIES
+            IMPORTED_LOCATION ${_codec_lib}
+            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/core/codec/include"
+        )
+        message(STATUS "Using prebuilt codec library (codec doesn't support source builds): ${_codec_lib}")
+    else()
+        message(WARNING "Codec prebuilt library not found, skipping codec module: ${_codec_lib}")
+    endif()
+else()
+    add_fin_module(codec core/codec)
+endif()
 add_fin_module(matrix src/matrix)
 
 # M02 Statistics
@@ -150,9 +188,6 @@ add_fin_module(math_funcs src/math_funcs)
 
 # M05 Random number generation
 add_fin_module(random src/random)
-
-# M06 Codec
-add_fin_module(codec src/codec)
 
 # M07 Data structures
 add_fin_module(ds src/ds)

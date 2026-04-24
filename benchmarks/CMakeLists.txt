@@ -36,12 +36,7 @@ add_executable(finkit_benchmarks
     matrix/bench_decompose.c
     matrix/bench_solve.c
     matrix/bench_tridiag.c
-    codec/bench_codec.c
-    codec/bench_fix_codec.c
 )
-
-# Add codec benchmarks subdirectory
-add_subdirectory(codec)
 
 # Link with benchmark framework and combined library
 target_link_libraries(finkit_benchmarks
