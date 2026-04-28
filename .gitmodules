@@ -4,3 +4,6 @@
 [submodule "core/codec"]
 	path = core/codec
 	url = ../codec
+[submodule "core/matrix"]
+	path = core/matrix
+	url = ../matrix

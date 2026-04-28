@@ -1,2 +1,0 @@
-#!/bin/bash
-exec clang -target aarch64-apple-darwin "$@"
