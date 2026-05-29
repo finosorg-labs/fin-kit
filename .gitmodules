@@ -1,9 +1,21 @@
 [submodule "core/platform"]
 	path = core/platform
-	url = ../platform
+	url = https://github.com/finosorg-labs/platform.git
+[submodule "core/ds"]
+	path = core/ds
+	url = https://github.com/finosorg-labs/ds.git
+[submodule "core/sort"]
+	path = core/sort
+	url = https://github.com/finosorg-labs/sort.git
 [submodule "core/codec"]
 	path = core/codec
-	url = ../codec
+	url = https://github.com/finosorg-labs/codec.git
 [submodule "core/matrix"]
 	path = core/matrix
-	url = ../matrix
+	url = https://github.com/finosorg-labs/matrix.git
+[submodule "core/stats"]
+	path = core/stats
+	url = https://github.com/finosorg-labs/stats.git
+[submodule "core/exchange"]
+	path = core/exchange
+	url = https://github.com/finosorg-labs/exchange.git
