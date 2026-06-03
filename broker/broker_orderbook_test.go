@@ -365,3 +365,69 @@ func TestOnSnapshotRebuildsOrderBook(t *testing.T) {
 		t.Fatalf("bid = %+v, want price=200 volume=50", snapshot.Bids[0])
 	}
 }
+
+func TestBrokerOrderBookHelperMethods(t *testing.T) {
+	book := NewBrokerOrderBook("AAPL", 1)
+	defer book.Close()
+
+	// Test Metrics()
+	metrics := book.Metrics()
+	if metrics == nil {
+		t.Error("Metrics() returned nil")
+	}
+
+	// Test SymbolID()
+	if book.SymbolID() != 1 {
+		t.Errorf("Expected SymbolID=1, got %d", book.SymbolID())
+	}
+
+	// Test Symbol()
+	if book.Symbol() != "AAPL" {
+		t.Errorf("Expected Symbol=AAPL, got %s", book.Symbol())
+	}
+}
+
+func TestBrokerOrderBookOnTradeNilOrder(t *testing.T) {
+	book := NewBrokerOrderBook("TEST", 1)
+	defer book.Close()
+
+	// Trade with non-existent order (should not error)
+	trade := &Trade{
+		BuyOrderID:  99999, // Non-existent order
+		SellOrderID: 0,
+		Price:       100,
+		Quantity:    10,
+		Timestamp:   1000,
+	}
+
+	if err := book.OnTrade(trade); err != nil {
+		t.Fatalf("OnTrade should not fail for non-existent order: %v", err)
+	}
+}
+
+func TestBrokerOrderBookOnSnapshotEmptyLevels(t *testing.T) {
+	book := NewBrokerOrderBook("TEST", 1)
+	defer book.Close()
+	snap := &ExchangeSnapshot{
+		SymbolID: 1,
+		Bids: []PriceLevel{
+			{Price: 100, TotalQty: 0}, // Zero quantity - should be skipped
+		},
+		Asks: []PriceLevel{
+			{Price: 101, TotalQty: 0}, // Zero quantity - should be skipped
+		},
+		Timestamp: time.Now(),
+	}
+
+	if err := book.OnSnapshot(snap); err != nil {
+		t.Fatalf("OnSnapshot failed: %v", err)
+	}
+
+	snapshot, err := book.GetSnapshot(10, exchange.OrderBookPrecisionKahan)
+	if err != nil {
+		t.Fatalf("GetSnapshot failed: %v", err)
+	}
+	if len(snapshot.Bids) != 0 || len(snapshot.Asks) != 0 {
+		t.Error("Expected empty order book after snapshot with zero quantities")
+	}
+}
