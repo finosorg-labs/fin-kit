@@ -2,140 +2,18 @@
 package broker
 
 // This file implements a read-only order book reconstruction layer for brokerage use cases.
-// It receives incremental updates and snapshots from exchanges and maintains a local order book state
-// without performing order matching.
+// It encapsulates the core order book and provides broker-specific functionality:
+//   - Incremental update processing (OnOrderIncrement)
+//   - Trade event handling with partial fill support (OnTrade)
+//   - Snapshot-based synchronization (OnSnapshot)
 
 import (
-	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/finosorg-labs/exchange"
 	coreob "github.com/finosorg-labs/exchange-c/orderbook"
 )
-
-var (
-	ErrNilOrderIncrement = errors.New("nil order increment")
-	ErrNilTrade          = errors.New("nil trade")
-	ErrNilSnapshot       = errors.New("nil exchange snapshot")
-	ErrNilSubscriber     = errors.New("nil snapshot subscriber")
-)
-
-// Side represents order side (buy or sell).
-type Side = coreob.Side
-
-const (
-	SideBuy  = coreob.SideBuy
-	SideSell = coreob.SideSell
-)
-
-// Order represents a single order in the order book.
-type Order = coreob.Order
-
-// PriceLevel represents aggregated orders at a specific price level.
-type PriceLevel = coreob.PriceLevel
-
-// Snapshot represents a complete order book snapshot with top N levels.
-type Snapshot = exchange.OrderBookSnapshot
-
-// OrderIncrementType specifies the type of order update.
-type OrderIncrementType int
-
-const (
-	OrderInsert OrderIncrementType = iota // Insert a new order
-	OrderDelete                  // Delete an existing order
-	OrderModify                   // Modify an existing order's quantity
-)
-
-// OrderIncrement represents an incremental order book update from the exchange.
-type OrderIncrement struct {
-	Type      OrderIncrementType
-	OrderID   int64
-	Price     int64 // Required for OrderInsert
-	Quantity  int64 // Required for OrderInsert and OrderModify
-	Side      Side  // Required for OrderInsert
-	Timestamp int64
-}
-
-// Trade represents a matched trade that affects order book state.
-// Supports both partial fills and complete fills.
-type Trade struct {
-	BuyOrderID  int64 // Order ID of the buy side, 0 if not applicable
-	SellOrderID int64 // Order ID of the sell side, 0 if not applicable
-	Price     int64 // Trade execution price
-	Quantity    int64 // Trade quantity (may be less than order quantity for partial fills)
-	Timestamp   int64
-}
-
-// ExchangeSnapshot represents a complete order book snapshot from the exchange.
-// Contains aggregated price levels rather than individual orders.
-type ExchangeSnapshot struct {
-	SymbolID  uint32
-	Bids      []PriceLevel // Bid price levels (descending order)
-	Asks      []PriceLevel // Ask price levels (ascending order)
-	Timestamp time.Time
-}
-
-// SnapshotSubscriber receives order book snapshot updates.
-type SnapshotSubscriber interface {
-	OnSnapshot(snapshot *Snapshot) error
-}
-
-// BrokerMetrics tracks order book update and snapshot generation metrics.
-// All methods are thread-safe using atomic operations.
-type BrokerMetrics struct {
-	updateCount     atomic.Int64 // Total number of order book updates
-	snapshotCount   atomic.Int64 // Total number of snapshots generated
-	lastUpdateNanos atomic.Int64 // Timestamp of last update in nanoseconds
-}
-
-// UpdateCount returns the total number of order book updates processed.
-func (m *BrokerMetrics) UpdateCount() int64 {
-	return m.updateCount.Load()
-}
-
-// SnapshotCount returns the total number of snapshots generated.
-func (m *BrokerMetrics) SnapshotCount() int64 {
-	return m.snapshotCount.Load()
-}
-
-// LastUpdate returns the timestamp of the last order book update.
-// Returns zero time if no updates have been processed.
-func (m *BrokerMetrics) LastUpdate() time.Time {
-	nanos := m.lastUpdateNanos.Load()
-	if nanos == 0 {
-		return time.Time{}
-	}
-	return time.Unix(0, nanos)
-}
-
-// SnapshotPublisher manages a list of snapshot subscribers and publishes updates to them.
-// Publishing uses fail-fast semantics: stops on first error.
-type SnapshotPublisher struct {
-	subscribers []SnapshotSubscriber
-}
-
-// Subscribe adds a new snapshot subscriber.
-// Returns ErrNilSubscriber if subscriber is nil.
-func (p *SnapshotPublisher) Subscribe(subscriber SnapshotSubscriber) error {
-	if subscriber == nil {
-		return ErrNilSubscriber
-	}
-	p.subscribers = append(p.subscribers, subscriber)
-	return nil
-}
-
-// Publish sends a snapshot to all subscribers.
-// Stops and returns error on first subscriber error (fail-fast semantics).
-func (p *SnapshotPublisher) Publish(snapshot *Snapshot) error {
-	for _, subscriber := range p.subscribers {
-		if err := subscriber.OnSnapshot(snapshot); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // BrokerOrderBook implements a read-only order book reconstruction layer for brokerage use cases.
 // It receives incremental updates and snapshots from exchanges and maintains a local order book state
@@ -145,22 +23,20 @@ func (p *SnapshotPublisher) Publish(snapshot *Snapshot) error {
 //   - Incremental update processing (OnOrderIncrement)
 //   - Trade event handling with partial fill support (OnTrade)
 //   - Snapshot-based synchronization (OnSnapshot)
-//   - Multi-level snapshot generation (GetSnapshot)
-//   - Publisher-subscriber pattern for snapshot distribution
 //
 // Concurrency: NOT thread-safe. Caller must serialize access.
 type BrokerOrderBook struct {
-	core      *coreob.OrderBook
-	metrics   *BrokerMetrics
-	publisher *SnapshotPublisher
+	core     *coreob.OrderBook
+	metrics  *BrokerMetrics
+	snapshot *SnapshotBuilder
 }
 
 // NewBrokerOrderBook creates a new broker order book for the given symbol.
 func NewBrokerOrderBook(symbol string, symbolID uint32) *BrokerOrderBook {
 	return &BrokerOrderBook{
-		core:      coreob.NewOrderBook(symbol, symbolID),
-		metrics:   &BrokerMetrics{},
-		publisher: &SnapshotPublisher{},
+		core:     coreob.NewOrderBook(symbol, symbolID),
+		metrics:  &BrokerMetrics{},
+		snapshot: NewSnapshotBuilder(),
 	}
 }
 
@@ -183,7 +59,7 @@ func (b *BrokerOrderBook) OnOrderIncrement(inc *OrderIncrement) error {
 			OrderID:   inc.OrderID,
 			Price:     inc.Price,
 			Quantity:  inc.Quantity,
-		Side:      inc.Side,
+			Side:      inc.Side,
 			Timestamp: inc.Timestamp,
 		})
 	case OrderDelete:
@@ -197,8 +73,7 @@ func (b *BrokerOrderBook) OnOrderIncrement(inc *OrderIncrement) error {
 		return err
 	}
 
-	b.metrics.updateCount.Add(1)
-	b.metrics.lastUpdateNanos.Store(time.Now().UnixNano())
+	b.metrics.RecordUpdate()
 	return nil
 }
 
@@ -212,7 +87,6 @@ func (b *BrokerOrderBook) OnOrderIncrement(inc *OrderIncrement) error {
 //
 // Returns an error if:
 //   - trade is nil
-//   - order lookup fails
 //   - order deletion or modification fails
 func (b *BrokerOrderBook) OnTrade(trade *Trade) error {
 	if trade == nil {
@@ -220,47 +94,46 @@ func (b *BrokerOrderBook) OnTrade(trade *Trade) error {
 	}
 
 	// Process buy side
-	if trade.BuyOrderID != 0 && b.core.ContainsOrder(trade.BuyOrderID) {
+	if trade.BuyOrderID != 0 {
 		buyOrder := b.core.GetOrderDetails(trade.BuyOrderID)
-		if buyOrder == nil {
-			return fmt.Errorf("buy order %d not found", trade.BuyOrderID)
-		}
-		if buyOrder.Quantity <= trade.Quantity {
-			// Complete fill: delete order
-			if err := b.core.DeleteOrder(trade.BuyOrderID); err != nil {
-				return err
+		if buyOrder != nil {
+			if buyOrder.Quantity <= trade.Quantity {
+				// Complete fill: delete order
+				if err := b.core.DeleteOrder(trade.BuyOrderID); err != nil {
+					return err
+				}
+			} else {
+				// Partial fill: reduce quantity
+				newQty := buyOrder.Quantity - trade.Quantity
+				if err := b.core.ModifyOrder(trade.BuyOrderID, newQty); err != nil {
+					return err
+				}
 			}
-		} else {
-			// Partial fill: reduce quantity
-			newQty := buyOrder.Quantity - trade.Quantity
-			if err := b.core.ModifyOrder(trade.BuyOrderID, newQty); err != nil {
-				return err
-			}
 		}
+		// If buyOrder is nil, the order was already deleted or doesn't exist - this is acceptable
 	}
 
 	// Process sell side
-	if trade.SellOrderID != 0 && b.core.ContainsOrder(trade.SellOrderID) {
+	if trade.SellOrderID != 0 {
 		sellOrder := b.core.GetOrderDetails(trade.SellOrderID)
-		if sellOrder == nil {
-			return fmt.Errorf("sell order %d not found", trade.SellOrderID)
-		}
-		if sellOrder.Quantity <= trade.Quantity {
-		// Complete fill: delete order
-			if err := b.core.DeleteOrder(trade.SellOrderID); err != nil {
-				return err
+		if sellOrder != nil {
+			if sellOrder.Quantity <= trade.Quantity {
+				// Complete fill: delete order
+				if err := b.core.DeleteOrder(trade.SellOrderID); err != nil {
+					return err
+				}
+			} else {
+				// Partial fill: reduce quantity
+				newQty := sellOrder.Quantity - trade.Quantity
+				if err := b.core.ModifyOrder(trade.SellOrderID, newQty); err != nil {
+					return err
+				}
 			}
-		} else {
-			// Partial fill: reduce quantity
-		newQty := sellOrder.Quantity - trade.Quantity
-			if err := b.core.ModifyOrder(trade.SellOrderID, newQty); err != nil {
-				return err
-			}
 		}
+		// If sellOrder is nil, the order was already deleted or doesn't exist - this is acceptable
 	}
 
-	b.metrics.updateCount.Add(1)
-	b.metrics.lastUpdateNanos.Store(time.Now().UnixNano())
+	b.metrics.RecordUpdate()
 	return nil
 }
 
@@ -332,19 +205,15 @@ func (b *BrokerOrderBook) OnSnapshot(snap *ExchangeSnapshot) error {
 		virtualOrderID--
 	}
 
-	b.metrics.updateCount.Add(1)
-	b.metrics.lastUpdateNanos.Store(time.Now().UnixNano())
+	b.metrics.RecordUpdate()
 	return nil
 }
 
-// GetSnapshot generates an order book snapshot and publishes it to all subscribers.
-// Returns the top N levels for both bid and ask sides.
-//
-// Note: This method both generates and publishes the snapshot.
-// If any subscriber returns an error, snapshot generation fails.
+// GetSnapshot generates a broker order book snapshot.
+// This method delegates snapshot building to the SnapshotBuilder and records the operation in metrics.
 //
 // Parameters:
-//   - topN: Maximum number of price levels per side (must be non-negative)
+//   - topN: Maximum number of price levels per side
 //   - precision: Volume aggregation precision mode
 //
 // Returns an error if:
@@ -352,31 +221,25 @@ func (b *BrokerOrderBook) OnSnapshot(snap *ExchangeSnapshot) error {
 //   - Snapshot generation fails
 //   - Snapshot publication fails (any subscriber error)
 func (b *BrokerOrderBook) GetSnapshot(topN int, precision exchange.OrderBookPrecisionMode) (*Snapshot, error) {
-	if topN < 0 {
-		return nil, fmt.Errorf("topN must be non-negative: %d", topN)
-	}
-
-	timestamp := time.Now()
-	orders := make([]exchange.Order, 0, topN+topN)
-	orders = appendLevels(orders, b.core.SymbolID(), b.core.GetTopNBids(topN), exchange.OrderBookSideBid, timestamp)
-	orders = appendLevels(orders, b.core.SymbolID(), b.core.GetTopNAsks(topN), exchange.OrderBookSideAsk, timestamp)
-
-	snapshot, err := exchange.GenerateSnapshot(orders, uint32(topN), precision, timestamp)
+	snapshot, err := b.snapshot.BuildAndPublish(
+		b.core.SymbolID(),
+		b.core.GetTopNBids(topN),
+		b.core.GetTopNAsks(topN),
+		topN,
+		precision,
+		time.Now(),
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	b.metrics.snapshotCount.Add(1)
-	if err := b.publisher.Publish(snapshot); err != nil {
-		return nil, err
-	}
+	b.metrics.RecordSnapshot()
 	return snapshot, nil
 }
 
 // Subscribe adds a snapshot subscriber.
 // The subscriber will receive all future snapshots generated by GetSnapshot.
 func (b *BrokerOrderBook) Subscribe(subscriber SnapshotSubscriber) error {
-	return b.publisher.Subscribe(subscriber)
+	return b.snapshot.Subscribe(subscriber)
 }
 
 // Close closes the order book and releases resources.
@@ -385,26 +248,17 @@ func (b *BrokerOrderBook) Close() error {
 	return b.core.Close()
 }
 
-// appendLevels converts price levels to exchange orders for snapshot generation.
-// Helper function used by GetSnapshot.
-func appendLevels(
-	orders []exchange.Order,
-	symbolID uint32,
-	levels []*PriceLevel,
-	side exchange.OrderBookSide,
-	timestamp time.Time,
-) []exchange.Order {
-	for _, level := range levels {
-		if level == nil {
-			continue
-		}
-		orders = append(orders, exchange.Order{
-			SymbolID:  symbolID,
-			Price:     float64(level.Price),
-			Volume:    float64(level.TotalQty),
-			Side:      side,
-			Timestamp: timestamp,
-		})
-	}
-	return orders
+// Metrics returns the broker metrics for this order book.
+func (b *BrokerOrderBook) Metrics() *BrokerMetrics {
+	return b.metrics
+}
+
+// SymbolID returns the symbol ID of this order book.
+func (b *BrokerOrderBook) SymbolID() uint32 {
+	return b.core.SymbolID()
+}
+
+// Symbol returns the symbol name of this order book.
+func (b *BrokerOrderBook) Symbol() string {
+	return b.core.Symbol()
 }
