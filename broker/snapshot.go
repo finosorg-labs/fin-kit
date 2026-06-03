@@ -39,6 +39,7 @@ func (sb *SnapshotBuilder) Subscribe(subscriber SnapshotSubscriber) error {
 //   - topN: Maximum number of price levels per side
 //   - precision: Volume aggregation precision mode
 //   - timestamp: Snapshot timestamp
+//   - tickSize: Price unit for converting int64 prices to float64 (e.g., 0.001 means price 10250 = 10.25)
 //
 // Returns the generated snapshot or an error if generation fails.
 func (sb *SnapshotBuilder) BuildSnapshot(
@@ -48,14 +49,18 @@ func (sb *SnapshotBuilder) BuildSnapshot(
 	topN int,
 	precision exchange.OrderBookPrecisionMode,
 	timestamp time.Time,
+	tickSize float64,
 ) (*Snapshot, error) {
 	if topN < 0 {
-		return nil, fmt.Errorf("topN must be non-negative: %d", topN)
+	return nil, fmt.Errorf("topN must be non-negative: %d", topN)
+	}
+	if tickSize <= 0 {
+		return nil, fmt.Errorf("tickSize must be positive: %f", tickSize)
 	}
 
 	orders := make([]exchange.Order, 0, topN+topN)
-	orders = appendLevels(orders, symbolID, bids, exchange.OrderBookSideBid, timestamp)
-	orders = appendLevels(orders, symbolID, asks, exchange.OrderBookSideAsk, timestamp)
+	orders = appendLevels(orders, symbolID, bids, exchange.OrderBookSideBid, timestamp, tickSize)
+	orders = appendLevels(orders, symbolID, asks, exchange.OrderBookSideAsk, timestamp, tickSize)
 
 	snapshot, err := exchange.GenerateSnapshot(orders, uint32(topN), precision, timestamp)
 	if err != nil {
@@ -76,8 +81,9 @@ func (sb *SnapshotBuilder) BuildAndPublish(
 	topN int,
 	precision exchange.OrderBookPrecisionMode,
 	timestamp time.Time,
+	tickSize float64,
 ) (*Snapshot, error) {
-	snapshot, err := sb.BuildSnapshot(symbolID, bids, asks, topN, precision, timestamp)
+	snapshot, err := sb.BuildSnapshot(symbolID, bids, asks, topN, precision, timestamp, tickSize)
 	if err != nil {
 		return nil, err
 	}
@@ -91,12 +97,17 @@ func (sb *SnapshotBuilder) BuildAndPublish(
 
 // appendLevels converts price levels to exchange orders for snapshot generation.
 // Helper function used by BuildSnapshot.
+//
+// Parameters:
+//   - tickSize: Price unit for converting int64 to float64 (e.g., 0.001 for stocks)
+//        Example: if level.Price = 10250 and tickSize = 0.001, then float price = 10.25
 func appendLevels(
 	orders []exchange.Order,
 	symbolID uint32,
 	levels []*PriceLevel,
 	side exchange.OrderBookSide,
 	timestamp time.Time,
+	tickSize float64,
 ) []exchange.Order {
 	for _, level := range levels {
 		if level == nil {
@@ -104,8 +115,8 @@ func appendLevels(
 		}
 		orders = append(orders, exchange.Order{
 			SymbolID:  symbolID,
-			Price:     float64(level.Price),
-			Volume:    float64(level.TotalQty),
+			Price:     float64(level.Price) * tickSize, // Convert int64 price to float64
+		Volume:    float64(level.TotalQty),          // Volume can be directly converted
 			Side:      side,
 			Timestamp: timestamp,
 		})

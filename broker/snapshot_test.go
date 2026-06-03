@@ -20,7 +20,7 @@ func TestSnapshotBuilderBuildSnapshot(t *testing.T) {
 		{Price: 102, TotalQty: 25},
 	}
 
-	snapshot, err := builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now())
+	snapshot, err := builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err != nil {
 		t.Fatalf("BuildSnapshot failed: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestSnapshotBuilderBuildSnapshotNegativeTopN(t *testing.T) {
 
 	bids := []*PriceLevel{{Price: 100, TotalQty: 10}}
 	asks := []*PriceLevel{{Price: 101, TotalQty: 15}}
-	_, err := builder.BuildSnapshot(1, bids, asks, -1, exchange.OrderBookPrecisionKahan, time.Now())
+	_, err := builder.BuildSnapshot(1, bids, asks, -1, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err == nil {
 		t.Error("Expected error for negative topN")
 	}
@@ -46,7 +46,7 @@ func TestSnapshotBuilderBuildSnapshotNegativeTopN(t *testing.T) {
 func TestSnapshotBuilderBuildSnapshotEmptyLevels(t *testing.T) {
 	builder := NewSnapshotBuilder()
 
-	snapshot, err := builder.BuildSnapshot(1, nil, nil, 10, exchange.OrderBookPrecisionKahan, time.Now())
+	snapshot, err := builder.BuildSnapshot(1, nil, nil, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err != nil {
 		t.Fatalf("BuildSnapshot failed: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSnapshotBuilderBuildAndPublish(t *testing.T) {
 	bids := []*PriceLevel{{Price: 100, TotalQty: 10}}
 	asks := []*PriceLevel{{Price: 101, TotalQty: 15}}
 
-	snapshot, err := builder.BuildAndPublish(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now())
+	snapshot, err := builder.BuildAndPublish(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err != nil {
 		t.Fatalf("BuildAndPublish failed: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestSnapshotBuilderBuildAndPublishFailure(t *testing.T) {
 	bids := []*PriceLevel{{Price: 100, TotalQty: 10}}
 	asks := []*PriceLevel{{Price: 101, TotalQty: 15}}
 
-	_, err := builder.BuildAndPublish(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now())
+	_, err := builder.BuildAndPublish(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err == nil {
 		t.Error("Expected error from failing subscriber")
 	}
@@ -126,12 +126,31 @@ func TestSnapshotBuilderBuildSnapshotWithNilLevels(t *testing.T) {
 		{Price: 101, TotalQty: 15},
 	}
 
-	snapshot, err := builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now())
+	snapshot, err := builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0.01)
 	if err != nil {
 		t.Fatalf("BuildSnapshot failed: %v", err)
 	}
 	// The nil levels should be filtered out in the appendLevels function
 	if snapshot == nil {
 		t.Fatal("Expected non-nil snapshot")
+	}
+}
+
+func TestSnapshotBuilderInvalidTickSize(t *testing.T) {
+	builder := NewSnapshotBuilder()
+
+	bids := []*PriceLevel{{Price: 100, TotalQty: 10}}
+	asks := []*PriceLevel{{Price: 101, TotalQty: 15}}
+
+	// Test zero tickSize
+	_, err := builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), 0)
+	if err == nil {
+	t.Error("Expected error for zero tickSize")
+	}
+
+	// Test negative tickSize
+	_, err = builder.BuildSnapshot(1, bids, asks, 10, exchange.OrderBookPrecisionKahan, time.Now(), -0.01)
+	if err == nil {
+		t.Error("Expected error for negative tickSize")
 	}
 }

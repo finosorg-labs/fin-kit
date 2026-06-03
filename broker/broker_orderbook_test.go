@@ -19,7 +19,7 @@ func (s *recordingSubscriber) OnSnapshot(snapshot *Snapshot) error {
 }
 
 func TestBrokerOrderBookOrderIncrementAndSnapshot(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0) // tickSize = 0.01
 	defer book.Close()
 
 	if err := book.OnOrderIncrement(&OrderIncrement{
@@ -74,7 +74,7 @@ func TestBrokerOrderBookOrderIncrementAndSnapshot(t *testing.T) {
 }
 
 func TestBrokerOrderBookModifyAndTradeDelete(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	if err := book.OnOrderIncrement(&OrderIncrement{
@@ -117,7 +117,7 @@ func TestBrokerOrderBookModifyAndTradeDelete(t *testing.T) {
 }
 
 func TestBrokerOrderBookPartialFill(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	// Insert an order with quantity 100
@@ -204,7 +204,7 @@ func TestBrokerOrderBookPartialFill(t *testing.T) {
 }
 
 func TestBrokerOrderBookSubscribePublishesSnapshot(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	subscriber := &recordingSubscriber{}
@@ -235,7 +235,7 @@ func TestBrokerOrderBookSubscribePublishesSnapshot(t *testing.T) {
 }
 
 func TestBrokerOrderBookSubscriberError(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	subscriberErr := errors.New("subscriber failed")
@@ -250,7 +250,7 @@ func TestBrokerOrderBookSubscriberError(t *testing.T) {
 }
 
 func TestBrokerOrderBookValidationErrors(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	if !errors.Is(book.OnOrderIncrement(nil), ErrNilOrderIncrement) {
@@ -278,7 +278,7 @@ func TestBrokerOrderBookValidationErrors(t *testing.T) {
 
 // TestOnSnapshotMultipleOrderIDZero tests if inserting multiple orders with OrderID=0 causes conflicts
 func TestOnSnapshotMultipleOrderIDZero(t *testing.T) {
-	book := NewBrokerOrderBook("TEST", 1)
+	book := NewBrokerOrderBook("TEST", 1, 1.0)
 	defer book.Close()
 
 	snap := &ExchangeSnapshot{
@@ -323,7 +323,7 @@ func TestOnSnapshotMultipleOrderIDZero(t *testing.T) {
 
 // TestOnSnapshotRebuildsOrderBook tests that OnSnapshot clears and rebuilds the order book
 func TestOnSnapshotRebuildsOrderBook(t *testing.T) {
-	book := NewBrokerOrderBook("TEST", 1)
+	book := NewBrokerOrderBook("TEST", 1, 1.0)
 	defer book.Close()
 
 	// Insert some initial orders
@@ -367,7 +367,7 @@ func TestOnSnapshotRebuildsOrderBook(t *testing.T) {
 }
 
 func TestBrokerOrderBookHelperMethods(t *testing.T) {
-	book := NewBrokerOrderBook("AAPL", 1)
+	book := NewBrokerOrderBook("AAPL", 1, 1.0)
 	defer book.Close()
 
 	// Test Metrics()
@@ -388,7 +388,7 @@ func TestBrokerOrderBookHelperMethods(t *testing.T) {
 }
 
 func TestBrokerOrderBookOnTradeNilOrder(t *testing.T) {
-	book := NewBrokerOrderBook("TEST", 1)
+	book := NewBrokerOrderBook("TEST", 1, 1.0)
 	defer book.Close()
 
 	// Trade with non-existent order (should not error)
@@ -406,7 +406,7 @@ func TestBrokerOrderBookOnTradeNilOrder(t *testing.T) {
 }
 
 func TestBrokerOrderBookOnSnapshotEmptyLevels(t *testing.T) {
-	book := NewBrokerOrderBook("TEST", 1)
+	book := NewBrokerOrderBook("TEST", 1, 1.0)
 	defer book.Close()
 	snap := &ExchangeSnapshot{
 		SymbolID: 1,

@@ -29,14 +29,21 @@ type BrokerOrderBook struct {
 	core     *coreob.OrderBook
 	metrics  *BrokerMetrics
 	snapshot *SnapshotBuilder
+	tickSize float64 // Price unit for int64 to float64 conversion
 }
 
 // NewBrokerOrderBook creates a new broker order book for the given symbol.
-func NewBrokerOrderBook(symbol string, symbolID uint32) *BrokerOrderBook {
+// tickSize specifies the price unit for converting integer prices to float64.
+// For example: tickSize=0.001 means price 10250 represents 10.25.
+func NewBrokerOrderBook(symbol string, symbolID uint32, tickSize float64) *BrokerOrderBook {
+	if tickSize <= 0 {
+		tickSize = 0.001 // Default to 0.001 (minimum price unit for most stocks)
+	}
 	return &BrokerOrderBook{
 		core:     coreob.NewOrderBook(symbol, symbolID),
 		metrics:  &BrokerMetrics{},
 		snapshot: NewSnapshotBuilder(),
+		tickSize: tickSize,
 	}
 }
 
@@ -228,6 +235,7 @@ func (b *BrokerOrderBook) GetSnapshot(topN int, precision exchange.OrderBookPrec
 		topN,
 		precision,
 		time.Now(),
+		b.tickSize, // Pass tickSize for proper price conversion
 	)
 	if err != nil {
 		return nil, err
