@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/finosorg-labs/exchange-c/orderbook v1.0.3
-	github.com/finosorg-labs/platform v0.0.0-00010101000000-000000000000
+	github.com/finosorg-labs/platform v1.0.5
 )
 
 require (
