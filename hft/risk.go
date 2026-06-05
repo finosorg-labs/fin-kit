@@ -3,6 +3,7 @@ package hft
 
 import (
 	"math"
+	"sort"
 	"sync"
 )
 
@@ -29,8 +30,8 @@ func NewRiskMonitor(position *PositionTracker) *RiskMonitor {
 
 // Calculate computes current risk metrics.
 func (r *RiskMonitor) Calculate() *RiskMetrics {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	position := r.position.GetPosition()
 	exposure := r.position.GetExposure()
@@ -91,7 +92,7 @@ func (r *RiskMonitor) calculateVaR() float64 {
 	// Sort returns
 	sortedReturns := make([]float64, len(returns))
 	copy(sortedReturns, returns)
-	quickSort(sortedReturns)
+	sort.Float64s(sortedReturns)
 
 	// Get the return at the confidence level percentile
 	idx := int(float64(len(sortedReturns)) * (1.0 - r.confidenceLevel))
@@ -161,37 +162,4 @@ func (r *RiskMonitor) CheckRiskLimits(maxExposure, maxDrawdown, maxVaR float64) 
 	}
 
 	return true
-}
-
-// Helper functions
-
-// quickSort sorts a float64 slice in place.
-func quickSort(arr []float64) {
-	if len(arr) < 2 {
-		return
-	}
-	quickSortHelper(arr, 0, len(arr)-1)
-}
-
-func quickSortHelper(arr []float64, low, high int) {
-	if low < high {
-		p := partition(arr, low, high)
-		quickSortHelper(arr, low, p-1)
-		quickSortHelper(arr, p+1, high)
-	}
-}
-
-func partition(arr []float64, low, high int) int {
-	pivot := arr[high]
-	i := low - 1
-
-	for j := low; j < high; j++ {
-		if arr[j] < pivot {
-			i++
-			arr[i], arr[j] = arr[j], arr[i]
-		}
-	}
-
-	arr[i+1], arr[high] = arr[high], arr[i+1]
-	return i + 1
 }

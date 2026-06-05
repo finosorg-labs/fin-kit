@@ -101,7 +101,9 @@ func (h *HFTOrderBook) GetImbalance() *ImbalanceMetrics {
 	if h.lastImbalance == nil {
 		return &ImbalanceMetrics{}
 	}
-	return h.lastImbalance
+	// Return a copy to prevent external modification
+	metrics := *h.lastImbalance
+	return &metrics
 }
 
 // GetLiquidity returns the latest liquidity metrics.
@@ -112,7 +114,9 @@ func (h *HFTOrderBook) GetLiquidity() *LiquidityMetrics {
 	if h.lastLiquidity == nil {
 		return &LiquidityMetrics{}
 	}
-	return h.lastLiquidity
+	// Return a copy to prevent external modification
+	metrics := *h.lastLiquidity
+	return &metrics
 }
 
 // GetSignal returns the latest trading signal.
@@ -123,7 +127,9 @@ func (h *HFTOrderBook) GetSignal() *Signal {
 	if h.lastSignal == nil {
 		return &Signal{Type: SignalHold, Timestamp: time.Now().UnixNano()}
 	}
-	return h.lastSignal
+	// Return a copy to prevent external modification
+	signal := *h.lastSignal
+	return &signal
 }
 
 // CheckRisk returns the current risk metrics.
@@ -134,7 +140,9 @@ func (h *HFTOrderBook) CheckRisk() (*RiskMetrics, error) {
 	if h.lastRisk == nil {
 		return &RiskMetrics{}, nil
 	}
-	return h.lastRisk, nil
+	// Return a copy to prevent external modification
+	metrics := *h.lastRisk
+	return &metrics, nil
 }
 
 // GetCore returns the underlying core order book for direct access.
