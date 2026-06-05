@@ -69,9 +69,10 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 	if order.Timestamp == 0 {
 		order.Timestamp = time.Now().UnixNano()
 	}
-
 	// Get account mapping for matching
 	accountMap := ob.GetAccountMap()
+	// Add incoming order to account map for consistency
+	accountMap[order.OrderID] = order.AccountID
 
 	// Try to match the order
 	trades, err := e.orderMatcher.Match(order, ob.coreBook, accountMap)
@@ -97,11 +98,22 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 		}
 
 		// Update order book for matched resting orders
-		if trade.SellFillType == FillTypeComplete {
-			ob.RemoveOrder(trade.SellOrderID)
+	// Determine which is the resting order (not the incoming order)
+		if trade.SellOrderID != order.OrderID {
+			// Sell side is resting order
+			if trade.SellFillType == FillTypeComplete {
+				ob.RemoveOrder(trade.SellOrderID)
+			} else if trade.SellFillType == FillTypePartial {
+				ob.UpdateOrder(trade.SellOrderID, trade.SellRemainingQty)
+			}
 		}
-		if trade.BuyFillType == FillTypeComplete {
-			ob.RemoveOrder(trade.BuyOrderID)
+		if trade.BuyOrderID != order.OrderID {
+			// Buy side is resting order
+			if trade.BuyFillType == FillTypeComplete {
+				ob.RemoveOrder(trade.BuyOrderID)
+			} else if trade.BuyFillType == FillTypePartial {
+				ob.UpdateOrder(trade.BuyOrderID, trade.BuyRemainingQty)
+			}
 		}
 	}
 

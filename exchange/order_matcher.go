@@ -246,11 +246,13 @@ func (m *OrderMatcher) createTrade(incoming *Order, resting *coreob.Order, resti
 		trade.BuyAccountID = incoming.AccountID
 		trade.SellOrderID = resting.OrderID
 		trade.SellAccountID = restingAccountID
+		trade.SellRemainingQty = resting.Quantity - quantity
 	} else {
 		trade.SellOrderID = incoming.OrderID
 		trade.SellAccountID = incoming.AccountID
 		trade.BuyOrderID = resting.OrderID
 		trade.BuyAccountID = restingAccountID
+		trade.BuyRemainingQty = resting.Quantity - quantity
 	}
 
 	return trade

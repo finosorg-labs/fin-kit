@@ -134,6 +134,10 @@ type Trade struct {
 	// Fill information
 	BuyFillType  FillType // Buy order fill type
 	SellFillType FillType // Sell order fill type
+
+	// Remaining quantities after this trade
+	BuyRemainingQty  int64 // Buy order remaining quantity
+	SellRemainingQty int64 // Sell order remaining quantity
 }
 
 // FillType represents the fill status of an order after a trade.

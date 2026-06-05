@@ -95,6 +95,10 @@ func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, 
 	tracked.TotalValue += price * qty
 	tracked.Trades = append(tracked.Trades, trade)
 
+	// Sync tracked state to original Order object
+	tracked.Order.FilledQty = tracked.FilledQty
+	tracked.Order.RemainingQty = tracked.RemainingQty
+
 	// Update status
 	if tracked.RemainingQty <= 0 {
 		tracked.Status = OrderStatusFilled
