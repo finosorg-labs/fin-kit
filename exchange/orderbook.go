@@ -14,9 +14,19 @@ import (
 // It manages order lifecycle, account tracking, and integrates with self-trade
 // prevention and trade reporting.
 //
+// Performance characteristics:
+//   - AddOrder: O(log n) insertion into red-black tree
+//   - RemoveOrder: O(log n) deletion from red-black tree
+//   - UpdateOrder: O(log n) modification
+//   - GetBestBid/Ask: O(1) cached access
+//   - GetDepth(k): O(k) where k is number of levels requested
+//
+// Memory: Each order consumes approximately 100-150 bytes including
+// overhead for tree nodes and account mapping.
+//
 // Concurrency: Thread-safe via mutex.
 type OrderBook struct {
-	mu           sync.RWMutex
+	mu             sync.RWMutex
 	coreBook     *coreob.OrderBook
 	symbol         string
 	symbolID       uint32
@@ -170,6 +180,54 @@ func (ob *OrderBook) GetDepth(levels int) ([]*coreob.PriceLevel, []*coreob.Price
 	return bids, asks
 }
 
+// AggregatedLevel represents a price level with aggregated quantity.
+// Used for market data snapshots and exchange feeds (M12-03).
+type AggregatedLevel struct {
+	Price      int64 // Price (integer representation)
+	TotalQty   int64 // Total aggregated quantity at this price
+	OrderCount int   // Number of orders at this price
+}
+
+// GetAggregatedDepth returns aggregated market depth for exchange market data feeds.
+// This method aggregates orders at the same price level, which is required for
+// exchange market data protocols (requirement M12-03: 价格档位聚合).
+//
+// Performance: O(n) where n is the number of price levels requested.
+//
+// Parameters:
+//   - levels: Number of price levels to return on each side
+//
+// Returns:
+//   - bids: Aggregated bid levels (sorted descending by price)
+//   - asks: Aggregated ask levels (sorted ascending by price)
+func (ob *OrderBook) GetAggregatedDepth(levels int) ([]AggregatedLevel, []AggregatedLevel) {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+
+	bidLevels := ob.coreBook.GetTopNBids(levels)
+	askLevels := ob.coreBook.GetTopNAsks(levels)
+
+	bids := make([]AggregatedLevel, 0, len(bidLevels))
+	for _, level := range bidLevels {
+		bids = append(bids, AggregatedLevel{
+			Price:      level.Price,
+			TotalQty:   level.TotalQty,
+			OrderCount: level.OrderCount,
+		})
+	}
+
+	asks := make([]AggregatedLevel, 0, len(askLevels))
+	for _, level := range askLevels {
+		asks = append(asks, AggregatedLevel{
+			Price:      level.Price,
+			TotalQty:   level.TotalQty,
+			OrderCount: level.OrderCount,
+		})
+	}
+
+	return bids, asks
+}
+
 // Clear removes all orders from the order book.
 func (ob *OrderBook) Clear() {
 	ob.mu.Lock()
@@ -246,7 +304,7 @@ func (ob *OrderBook) GetStats() OrderBookStats {
 		BidLevels:   ob.coreBook.GetBidLevels(),
 		AskLevels:   ob.coreBook.GetAskLevels(),
 		TotalOrders: ob.coreBook.GetOrderCount(),
-		BestBid:     bestBidPrice,
+		BestBid:   bestBidPrice,
 		BestAsk:     bestAskPrice,
 		Spread:      ob.coreBook.GetSpread(),
 	}

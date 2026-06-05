@@ -162,7 +162,17 @@ func (r *TradeReporter) RejectOrder(orderID int64, reason string) (*ExecutionRep
 
 	tracked, exists := r.orders[orderID]
 	if !exists {
-		return nil, ErrOrderNotFound
+		// Order was never registered, create minimal report
+		return &ExecutionReport{
+			OrderID:      orderID,
+			Status:       OrderStatusRejected,
+			FilledQty:    0,
+			RemainingQty: 0,
+			AvgPrice:     0,
+			Trades:       nil,
+			RejectReason: reason,
+			Timestamp:    time.Now().UnixNano(),
+		}, nil
 	}
 
 	tracked.Status = OrderStatusRejected

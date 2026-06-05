@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -30,7 +31,7 @@ func TestOrderCreation(t *testing.T) {
 			name:      "Invalid order ID",
 			orderID:   0,
 			accountID: "ACC1",
-		price:     100,
+			price:     100,
 			quantity:  10,
 			side:      SideBuy,
 			orderType: OrderTypeLimit,
@@ -50,7 +51,7 @@ func TestOrderCreation(t *testing.T) {
 			name:      "Invalid quantity",
 			orderID:   1,
 			accountID: "ACC1",
-		price:     100,
+			price:     100,
 			quantity:  0,
 			side:      SideBuy,
 			orderType: OrderTypeLimit,
@@ -72,7 +73,7 @@ func TestOrderCreation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			order, err := NewOrder(tt.orderID, tt.accountID, tt.price, tt.quantity, tt.side, tt.orderType)
 			if (err != nil) != tt.wantErr {
-			t.Errorf("NewOrder() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewOrder() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && order == nil {
@@ -92,9 +93,9 @@ func TestSelfTradeDetection(t *testing.T) {
 	stc.RegisterOrder(3, "ACC2", SideBuy)
 
 	tests := []struct {
-		name           string
-		buyAccountID   string
-	sellAccountID  string
+		name            string
+		buyAccountID    string
+		sellAccountID   string
 		expectSelfTrade bool
 	}{
 		{
@@ -104,7 +105,7 @@ func TestSelfTradeDetection(t *testing.T) {
 			expectSelfTrade: true,
 		},
 		{
-			name:          "No self-trade",
+			name:            "No self-trade",
 			buyAccountID:    "ACC1",
 			sellAccountID:   "ACC2",
 			expectSelfTrade: false,
@@ -144,7 +145,7 @@ func TestTradeReporter(t *testing.T) {
 		AccountID:    "ACC1",
 		Price:        100,
 		Quantity:     10,
-		Side:     SideBuy,
+		Side:         SideBuy,
 		Type:         OrderTypeLimit,
 		RemainingQty: 10,
 	}
@@ -152,7 +153,7 @@ func TestTradeReporter(t *testing.T) {
 	tr.RegisterOrder(order)
 
 	sellOrder := &Order{
-		OrderID:   2,
+		OrderID:      2,
 		AccountID:    "ACC2",
 		Price:        100,
 		Quantity:     10,
@@ -168,7 +169,7 @@ func TestTradeReporter(t *testing.T) {
 		SellOrderID:   2,
 		BuyAccountID:  "ACC1",
 		SellAccountID: "ACC2",
-		Price:    100,
+		Price:         100,
 		Quantity:      5,
 	}
 
@@ -216,7 +217,7 @@ func TestMatchingEngine(t *testing.T) {
 	buyOrder := &Order{
 		OrderID:      1,
 		AccountID:    "ACC1",
-	Price:        100,
+		Price:        100,
 		Quantity:     10,
 		Side:         SideBuy,
 		Type:         OrderTypeLimit,
@@ -235,7 +236,7 @@ func TestMatchingEngine(t *testing.T) {
 	sellOrder := &Order{
 		OrderID:      2,
 		AccountID:    "ACC2",
-		Price:     100,
+		Price:        100,
 		Quantity:     5,
 		Side:         SideSell,
 		Type:         OrderTypeLimit,
@@ -274,8 +275,8 @@ func TestSelfTradePrevent(t *testing.T) {
 	// Submit a buy order
 	buyOrder := &Order{
 		OrderID:      1,
-		AccountID:  "ACC1",
-		Price:     100,
+		AccountID:    "ACC1",
+		Price:        100,
 		Quantity:     10,
 		Side:         SideBuy,
 		Type:         OrderTypeLimit,
@@ -361,9 +362,9 @@ func TestIOCOrder(t *testing.T) {
 		OrderID:      1,
 		AccountID:    "ACC1",
 		Price:        100,
-	Quantity:     3,
-		Side:       SideSell,
-		Type:     OrderTypeLimit,
+		Quantity:     3,
+		Side:         SideSell,
+		Type:         OrderTypeLimit,
 		RemainingQty: 3,
 	}
 
@@ -446,7 +447,7 @@ func TestOrderCancellation(t *testing.T) {
 
 	// Submit a limit buy order
 	order := &Order{
-		OrderID:    1,
+		OrderID:      1,
 		AccountID:    "ACC1",
 		Price:        100,
 		Quantity:     10,
@@ -487,7 +488,7 @@ func TestMatchingEngineStats(t *testing.T) {
 			Price:        100 + i,
 			Quantity:     10,
 			Side:         SideBuy,
-			Type:      OrderTypeLimit,
+			Type:         OrderTypeLimit,
 			RemainingQty: 10,
 		}
 		engine.SubmitOrder(order)
@@ -498,5 +499,246 @@ func TestMatchingEngineStats(t *testing.T) {
 	}
 	if !stats.Running {
 		t.Error("Expected engine to be running")
+	}
+}
+
+// benchmarks
+
+// BenchmarkSubmitOrder benchmarks order submission to matching engine.
+func BenchmarkSubmitOrder(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+	// Pre-populate with some orders
+	for i := int64(1); i <= 100; i++ {
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100 + (i % 10),
+			Quantity:     10,
+			Side:         SideBuy,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		order := &Order{
+			OrderID:      int64(1000 + i),
+			AccountID:    fmt.Sprintf("BENCH%d", i),
+			Price:        95,
+			Quantity:     5,
+			Side:         SideSell,
+			Type:         OrderTypeLimit,
+			RemainingQty: 5,
+		}
+		engine.SubmitOrder(order)
+	}
+}
+
+// BenchmarkMatchOrder benchmarks order matching performance.
+func BenchmarkMatchOrder(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+
+	// Pre-populate with resting orders
+	for i := int64(1); i <= 1000; i++ {
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100,
+			Quantity:     10,
+			Side:         SideSell,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		order := &Order{
+			OrderID:      int64(10000 + i),
+			AccountID:    fmt.Sprintf("BENCH%d", i),
+			Price:        100,
+			Quantity:     10,
+			Side:         SideBuy,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+}
+
+// BenchmarkSelfTradeCheck benchmarks self-trade detection.
+func BenchmarkSelfTradeCheck(b *testing.B) {
+	stc := NewSelfTradeCheck()
+
+	// Register many orders
+	for i := int64(1); i <= 10000; i++ {
+		side := SideBuy
+		if i%2 == 0 {
+			side = SideSell
+		}
+		stc.RegisterOrder(i, fmt.Sprintf("ACC%d", i%100), side)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stc.Check("ACC1", "ACC2")
+	}
+}
+
+// BenchmarkGetDepth benchmarks order book depth retrieval.
+func BenchmarkGetDepth(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+
+	// Pre-populate order book
+	for i := int64(1); i <= 1000; i++ {
+		side := SideBuy
+		if i%2 == 0 {
+			side = SideSell
+		}
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100 + (i % 50),
+			Quantity:     10,
+			Side:         side,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	ob, _ := engine.GetOrderBook("DEFAULT")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ob.GetDepth(10)
+	}
+}
+
+// BenchmarkGetAggregatedDepth benchmarks aggregated depth calculation.
+func BenchmarkGetAggregatedDepth(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+
+	// Pre-populate order book
+	for i := int64(1); i <= 1000; i++ {
+		side := SideBuy
+		if i%2 == 0 {
+			side = SideSell
+		}
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100 + (i % 50),
+			Quantity:     10,
+			Side:         side,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	ob, _ := engine.GetOrderBook("DEFAULT")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ob.GetAggregatedDepth(10)
+	}
+}
+
+// BenchmarkTradeReporting benchmarks trade report generation.
+func BenchmarkTradeReporting(b *testing.B) {
+	tr := NewTradeReporter()
+
+	// Register an order
+	order := &Order{
+		OrderID:      1,
+		AccountID:    "ACC1",
+		Price:        100,
+		Quantity:     10000,
+		Side:         SideBuy,
+		Type:         OrderTypeLimit,
+		RemainingQty: 10000,
+	}
+	tr.RegisterOrder(order)
+
+	sellOrder := &Order{
+		OrderID:      2,
+		AccountID:    "ACC2",
+		Price:        100,
+		Quantity:     10000,
+		Side:         SideSell,
+		Type:         OrderTypeLimit,
+		RemainingQty: 10000,
+	}
+	tr.RegisterOrder(sellOrder)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		trade := &Trade{
+			BuyOrderID:    1,
+			SellOrderID:   2,
+			BuyAccountID:  "ACC1",
+			SellAccountID: "ACC2",
+			Price:         100,
+			Quantity:      1,
+		}
+		tr.RecordTrade(trade)
+	}
+}
+
+// BenchmarkConcurrentSubmit benchmarks concurrent order submission.
+func BenchmarkConcurrentSubmit(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+
+	b.RunParallel(func(pb *testing.PB) {
+		i := int64(0)
+		for pb.Next() {
+			i++
+			order := &Order{
+				OrderID:      i * 100000,
+				AccountID:    fmt.Sprintf("ACC%d", i),
+				Price:        100,
+				Quantity:     10,
+				Side:         SideBuy,
+				Type:         OrderTypeLimit,
+				RemainingQty: 10,
+			}
+			engine.SubmitOrder(order)
+		}
+	})
+}
+
+// BenchmarkOrderBookStats benchmarks statistics collection.
+func BenchmarkOrderBookStats(b *testing.B) {
+	engine := NewMatchingEngine()
+	defer engine.Close()
+
+	// Pre-populate order book
+	for i := int64(1); i <= 100; i++ {
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100,
+			Quantity:     10,
+			Side:         SideBuy,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	ob, _ := engine.GetOrderBook("DEFAULT")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ob.GetStats()
 	}
 }
