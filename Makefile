@@ -15,17 +15,16 @@
 # Note: C library builds are handled by individual submodules in core/
 #       Navigate to core/<module>/ and run make there for C builds
 
-.PHONY: default go test clean help sync
+.PHONY: default test clean help sync
 
-default: go
-
-go:
-	@echo "==> Building Go module (verify compilation)"
-	cd go && go build ./...
+default: test
 
 test:
-	@echo "==> Running Go tests"
-	cd go && go test -vet=all -race -parallel=4 -v ./...
+	@echo "==> Running  Go tests"
+	@cd broker && CGO_ENABLED=1 CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test -vet=all -race -parallel=4 -tags lib ./... -v
+	@cd exchange && CGO_ENABLED=1 CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test -vet=all -race -parallel=4 -tags lib ./... -v
+	@cd hft && CGO_ENABLED=1 CGO_CFLAGS_ALLOW="-m(avx2|avx512f|avx512dq|fma|sse4\.2)" go test -vet=all -race -parallel=4 -tags lib ./... -v
+
 
 clean:
 	rm -rf build
