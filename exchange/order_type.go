@@ -10,22 +10,6 @@ import (
 	coreob "github.com/finosorg-labs/exchange-c/orderbook"
 )
 
-// Common errors
-var (
-	ErrNilOrder          = errors.New("nil order")
-	ErrNilTrade          = errors.New("nil trade")
-	ErrInvalidOrderID    = errors.New("invalid order ID")
-	ErrInvalidAccountID  = errors.New("invalid account ID")
-	ErrInvalidQuantity   = errors.New("invalid quantity")
-	ErrInvalidPrice      = errors.New("invalid price")
-	ErrOrderNotFound     = errors.New("order not found")
-	ErrSelfTrade         = errors.New("self-trade detected")
-	ErrInsufficientQty   = errors.New("insufficient quantity for FOK order")
-	ErrInvalidOrderType  = errors.New("invalid order type")
-	ErrOrderBookClosed   = errors.New("order book closed")
-	ErrDuplicateOrderID  = errors.New("duplicate order ID")
-)
-
 // Side represents order side (buy or sell).
 type Side = coreob.Side
 
@@ -39,45 +23,28 @@ type OrderType int
 
 const (
 	OrderTypeLimit   OrderType = iota // Limit order: match at specified price or better
-	OrderTypeMarket              // Market order: match at best available price
-	OrderTypeFOK                   // Fill-Or-Kill: complete fill or cancel
-	OrderTypeIOC                  // Immediate-Or-Cancel: fill available, cancel rest
+	OrderTypeMarket                   // Market order: match at best available price
+	OrderTypeFOK                      // Fill-Or-Kill: complete fill or cancel
+	OrderTypeIOC                      // Immediate-Or-Cancel: fill available, cancel rest
 	OrderTypeIceberg                  // Iceberg: display only partial quantity
 )
 
-func (t OrderType) String() string {
-	switch t {
-	case OrderTypeLimit:
-		return "Limit"
-	case OrderTypeMarket:
-		return "Market"
-	case OrderTypeFOK:
-		return "FOK"
-	case OrderTypeIOC:
-		return "IOC"
-	case OrderTypeIceberg:
-		return "Iceberg"
-	default:
-		return fmt.Sprintf("Unknown(%d)", t)
-	}
-}
-
 // Order represents a user order submitted to the matching engine.
 type Order struct {
-	OrderID       int64     // Unique order identifier
-	AccountID     string    // Account identifier for self-trade prevention
-	Symbol        string    // Trading symbol (e.g., "BTCUSD")
-	Price         int64     // Order price (integer representation)
-	Quantity      int64     // Total order quantity
-	VisibleQty    int64     // Visible quantity for iceberg orders (0 = show all)
-	Side          Side      // Buy or Sell
-	Type          OrderType // Order type
-	Timestamp     int64     // Order submission timestamp (nanoseconds)
+	OrderID    int64     // Unique order identifier
+	AccountID  string    // Account identifier for self-trade prevention
+	Symbol     string    // Trading symbol (e.g., "BTCUSD")
+	Price      int64     // Order price (integer representation)
+	Quantity   int64     // Total order quantity
+	VisibleQty int64     // Visible quantity for iceberg orders (0 = show all)
+	Side       Side      // Buy or Sell
+	Type       OrderType // Order type
+	Timestamp  int64     // Order submission timestamp (nanoseconds)
 
 	// Internal fields for tracking
-	FilledQty     int64     // Quantity already filled
-	CanceledQty   int64     // Quantity canceled
-	RemainingQty  int64     // Remaining quantity to be filled
+	FilledQty    int64 // Quantity already filled
+	CanceledQty  int64 // Quantity canceled
+	RemainingQty int64 // Remaining quantity to be filled
 }
 
 // NewOrder creates a new order with validation.
@@ -122,14 +89,14 @@ func NewIcebergOrder(orderID int64, accountID string, price, quantity, visibleQt
 
 // Trade represents a matched trade between two orders.
 type Trade struct {
-	TradeID      int64  // Unique trade identifier
-	BuyOrderID   int64  // Buy side order ID
-	SellOrderID  int64  // Sell side order ID
-	BuyAccountID string // Buy side account ID
+	TradeID       int64  // Unique trade identifier
+	BuyOrderID    int64  // Buy side order ID
+	SellOrderID   int64  // Sell side order ID
+	BuyAccountID  string // Buy side account ID
 	SellAccountID string // Sell side account ID
-	Price      int64  // Execution price
-	Quantity     int64  // Execution quantity
-	Timestamp    int64  // Execution timestamp (nanoseconds)
+	Price         int64  // Execution price
+	Quantity      int64  // Execution quantity
+	Timestamp     int64  // Execution timestamp (nanoseconds)
 
 	// Fill information
 	BuyFillType  FillType // Buy order fill type
@@ -146,8 +113,49 @@ type FillType int
 const (
 	FillTypePartial  FillType = iota // Partial fill: order still has remaining quantity
 	FillTypeComplete                 // Complete fill: order fully executed
-	FillTypeCanceled               // Order canceled (IOC, FOK)
+	FillTypeCanceled                 // Order canceled (IOC, FOK)
 )
+
+// OrderStatus represents the current status of an order.
+type OrderStatus int
+
+const (
+	OrderStatusNew      OrderStatus = iota // Order submitted, not yet matched
+	OrderStatusPartial                     // Order partially filled
+	OrderStatusFilled                      // Order completely filled
+	OrderStatusCanceled                    // Order canceled
+	OrderStatusRejected                    // Order rejected
+)
+
+// ExecutionReport contains details about an order's execution.
+type ExecutionReport struct {
+	OrderID      int64       // Order ID
+	AccountID    string      // Account ID
+	Status       OrderStatus // Order status after execution
+	FilledQty    int64       // Total quantity filled
+	RemainingQty int64       // Remaining quantity
+	AvgPrice     float64     // Average fill price
+	Trades       []*Trade    // Trades generated by this order
+	RejectReason string      // Rejection reason (if rejected)
+	Timestamp    int64       // Report timestamp
+}
+
+func (t OrderType) String() string {
+	switch t {
+	case OrderTypeLimit:
+		return "Limit"
+	case OrderTypeMarket:
+		return "Market"
+	case OrderTypeFOK:
+		return "FOK"
+	case OrderTypeIOC:
+		return "IOC"
+	case OrderTypeIceberg:
+		return "Iceberg"
+	default:
+		return fmt.Sprintf("Unknown(%d)", t)
+	}
+}
 
 func (f FillType) String() string {
 	switch f {
@@ -161,17 +169,6 @@ func (f FillType) String() string {
 		return fmt.Sprintf("Unknown(%d)", f)
 	}
 }
-
-// OrderStatus represents the current status of an order.
-type OrderStatus int
-
-const (
-	OrderStatusNew       OrderStatus = iota // Order submitted, not yet matched
-	OrderStatusPartial                      // Order partially filled
-	OrderStatusFilled              // Order completely filled
-	OrderStatusCanceled                     // Order canceled
-	OrderStatusRejected           // Order rejected
-)
 
 func (s OrderStatus) String() string {
 	switch s {
@@ -190,15 +187,18 @@ func (s OrderStatus) String() string {
 	}
 }
 
-// ExecutionReport contains details about an order's execution.
-type ExecutionReport struct {
-	OrderID       int64    // Order ID
-	AccountID     string      // Account ID
-	Status        OrderStatus // Order status after execution
-	FilledQty     int64       // Total quantity filled
-	RemainingQty  int64     // Remaining quantity
-	AvgPrice      float64     // Average fill price
-	Trades        []*Trade    // Trades generated by this order
-	RejectReason  string      // Rejection reason (if rejected)
-	Timestamp     int64     // Report timestamp
-}
+// Common errors
+var (
+	ErrNilOrder         = errors.New("nil order")
+	ErrNilTrade         = errors.New("nil trade")
+	ErrInvalidOrderID   = errors.New("invalid order ID")
+	ErrInvalidAccountID = errors.New("invalid account ID")
+	ErrInvalidQuantity  = errors.New("invalid quantity")
+	ErrInvalidPrice     = errors.New("invalid price")
+	ErrOrderNotFound    = errors.New("order not found")
+	ErrSelfTrade        = errors.New("self-trade detected")
+	ErrInsufficientQty  = errors.New("insufficient quantity for FOK order")
+	ErrInvalidOrderType = errors.New("invalid order type")
+	ErrOrderBookClosed  = errors.New("order book closed")
+	ErrDuplicateOrderID = errors.New("duplicate order ID")
+)

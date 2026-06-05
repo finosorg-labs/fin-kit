@@ -56,13 +56,13 @@ import (
 //   - Batching operations when possible
 //   - Monitoring lock contention on high-volume symbols
 type MatchingEngine struct {
-	mu            sync.RWMutex
-	orderBooks      map[string]*OrderBook       // symbol -> order book
-	selfTradeCheck  *SelfTradeCheck
-	tradeReporter   *TradeReporter
-	orderMatcher    *OrderMatcher
-	orderIDCounter  int64
-	running         bool
+	mu             sync.RWMutex
+	orderBooks     map[string]*OrderBook // symbol -> order book
+	selfTradeCheck *SelfTradeCheck
+	tradeReporter  *TradeReporter
+	orderMatcher   *OrderMatcher
+	orderIDCounter int64
+	running        bool
 }
 
 // NewMatchingEngine creates a new matching engine.
@@ -138,7 +138,7 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 		}
 
 		// Update order book for matched resting orders
-	// Determine which is the resting order (not the incoming order)
+		// Determine which is the resting order (not the incoming order)
 		if trade.SellOrderID != order.OrderID {
 			// Sell side is resting order
 			if trade.SellFillType == FillTypeComplete {
@@ -159,7 +159,7 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 
 	// If order has remaining quantity, add it to the order book
 	if order.RemainingQty > 0 && order.Type != OrderTypeMarket &&
-	   order.Type != OrderTypeIOC && order.Type != OrderTypeFOK {
+		order.Type != OrderTypeIOC && order.Type != OrderTypeFOK {
 		if err := ob.AddOrder(order); err != nil {
 			return nil, fmt.Errorf("failed to add order to book: %w", err)
 		}
@@ -187,7 +187,7 @@ func (e *MatchingEngine) CancelOrder(symbol string, orderID int64, reason string
 	}
 
 	// Get order book
-	ob, err := e.getOrderBook(symbol)
+	ob, err := e.GetOrderBook(symbol)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (e *MatchingEngine) ModifyOrder(symbol string, orderID int64, newQuantity i
 	}
 
 	// Get order book
-	ob, err := e.getOrderBook(symbol)
+	ob, err := e.GetOrderBook(symbol)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,14 @@ func (e *MatchingEngine) ModifyOrder(symbol string, orderID int64, newQuantity i
 
 // GetOrderBook returns the order book for a symbol.
 func (e *MatchingEngine) GetOrderBook(symbol string) (*OrderBook, error) {
-	return e.getOrderBook(symbol)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	ob, exists := e.orderBooks[symbol]
+	if !exists {
+		return nil, fmt.Errorf("order book not found for symbol: %s", symbol)
+	}
+	return ob, nil
 }
 
 // GetOrderReport returns the execution report for an order.
@@ -272,18 +279,6 @@ func (e *MatchingEngine) Close() {
 	// Clear tracking components
 	e.selfTradeCheck.Clear()
 	e.tradeReporter.Clear()
-}
-
-// getOrderBook retrieves an existing order book.
-func (e *MatchingEngine) getOrderBook(symbol string) (*OrderBook, error) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	ob, exists := e.orderBooks[symbol]
-	if !exists {
-		return nil, fmt.Errorf("order book not found for symbol: %s", symbol)
-	}
-	return ob, nil
 }
 
 // getOrCreateOrderBook retrieves or creates an order book for an order.
@@ -362,6 +357,6 @@ func (e *MatchingEngine) GetStats() MatchingEngineStats {
 		TotalOrderBooks:   len(e.orderBooks),
 		TotalActiveOrders: totalOrders,
 		TotalTrades:       tradeStats.TotalTrades,
-	Running:           e.running,
+		Running:           e.running,
 	}
 }
