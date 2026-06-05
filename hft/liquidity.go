@@ -7,15 +7,17 @@ import (
 
 // LiquidityAnalyzer analyzes order book liquidity metrics.
 type LiquidityAnalyzer struct {
-	orderbook *HFTOrderBook
-	tickSize  float64
+	orderbook   *HFTOrderBook
+	tickSize    float64
+	standardQty int64 // Standard order size for market impact calculation
 }
 
 // NewLiquidityAnalyzer creates a new liquidity analyzer.
 func NewLiquidityAnalyzer(ob *HFTOrderBook, tickSize float64) *LiquidityAnalyzer {
 	return &LiquidityAnalyzer{
-		orderbook: ob,
-		tickSize:  tickSize,
+		orderbook:   ob,
+		tickSize:    tickSize,
+		standardQty: 100, // Default standard quantity
 	}
 }
 
@@ -64,8 +66,7 @@ func (l *LiquidityAnalyzer) Calculate() *LiquidityMetrics {
 	}
 
 	// Market impact (estimated for a standard order size)
-	const standardQty = 100
-	marketImpact := l.calculateMarketImpact(bids, asks, standardQty)
+	marketImpact := l.calculateMarketImpact(bids, asks, l.standardQty, midPrice)
 
 	return &LiquidityMetrics{
 		BidDepth:        bidDepth,
@@ -78,13 +79,7 @@ func (l *LiquidityAnalyzer) Calculate() *LiquidityMetrics {
 }
 
 // calculateMarketImpact estimates the price impact of executing a given quantity.
-func (l *LiquidityAnalyzer) calculateMarketImpact(bids, asks []*PriceLevel, qty int64) float64 {
-	if len(bids) == 0 || len(asks) == 0 {
-		return 0.0
-	}
-
-	midPrice := float64(bids[0].Price+asks[0].Price) / 2.0
-
+func (l *LiquidityAnalyzer) calculateMarketImpact(bids, asks []*PriceLevel, qty int64, midPrice float64) float64 {
 	// Calculate average execution price for buying qty
 	remaining := qty
 	var totalCost int64
@@ -109,6 +104,13 @@ func (l *LiquidityAnalyzer) calculateMarketImpact(bids, asks []*PriceLevel, qty 
 	impact := math.Abs(avgPrice-midPrice) / midPrice
 
 	return impact
+}
+
+// SetStandardQuantity sets the standard order size for market impact calculation.
+func (l *LiquidityAnalyzer) SetStandardQuantity(qty int64) {
+	if qty > 0 {
+		l.standardQty = qty
+	}
 }
 
 // CalculateWithQuantity computes market impact for a specific quantity.

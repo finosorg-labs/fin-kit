@@ -5,6 +5,13 @@ import (
 	"math"
 )
 
+// Default signal generation thresholds
+const (
+	DefaultImbalanceThreshold = 0.3  // 30% order flow imbalance triggers buy/sell signal
+	DefaultLiquidityThreshold = 0.01 // 1% market impact threshold for confidence calculation
+	DefaultStrengthDecay      = 0.95 // Signal strength decay factor per time unit
+)
+
 // SignalGenerator generates trading signals from order book metrics.
 type SignalGenerator struct {
 	// Thresholds for signal generation
@@ -16,9 +23,9 @@ type SignalGenerator struct {
 // NewSignalGenerator creates a new signal generator with default thresholds.
 func NewSignalGenerator() *SignalGenerator {
 	return &SignalGenerator{
-		imbalanceThreshold: 0.3,  // 30% imbalance triggers signal
-		liquidityThreshold: 0.01, // 1% market impact threshold
-		strengthDecay:      0.95, // Signal strength decay factor
+		imbalanceThreshold: DefaultImbalanceThreshold,
+		liquidityThreshold: DefaultLiquidityThreshold,
+		strengthDecay:      DefaultStrengthDecay,
 	}
 }
 
@@ -132,18 +139,79 @@ func (s *SignalGenerator) GenerateWithThresholds(
 	timestamp int64,
 	imbalanceThresh, liquidityThresh float64,
 ) *Signal {
-	oldImbalanceThresh := s.imbalanceThreshold
-	oldLiquidityThresh := s.liquidityThreshold
+	if imbalance == nil || liquidity == nil {
+		return &Signal{
+			Type:       SignalHold,
+			Strength:   0.0,
+			Confidence: 0.0,
+			Timestamp:  timestamp,
+		}
+	}
 
-	s.imbalanceThreshold = imbalanceThresh
-	s.liquidityThreshold = liquidityThresh
+	// Determine signal type based on order flow balance
+	var signalType SignalType
+	if imbalance.OrderFlowBalance > imbalanceThresh {
+		signalType = SignalBuy
+	} else if imbalance.OrderFlowBalance < -imbalanceThresh {
+		signalType = SignalSell
+	} else {
+		signalType = SignalHold
+	}
 
-	signal := s.Generate(imbalance, liquidity, timestamp)
+	// Calculate signal strength based on imbalance magnitude
+	strength := math.Abs(imbalance.OrderFlowBalance)
+	if strength > 1.0 {
+		strength = 1.0
+	}
 
-	s.imbalanceThreshold = oldImbalanceThresh
-	s.liquidityThreshold = oldLiquidityThresh
+	// Calculate confidence with custom thresholds
+	confidence := s.calculateConfidenceWithThresholds(imbalance, liquidity, liquidityThresh)
 
-	return signal
+	return &Signal{
+		Type:       signalType,
+		Strength:   strength,
+		Confidence: confidence,
+		Timestamp:  timestamp,
+	}
+}
+
+// calculateConfidenceWithThresholds computes signal confidence with custom liquidity threshold.
+func (s *SignalGenerator) calculateConfidenceWithThresholds(
+	imbalance *ImbalanceMetrics,
+	liquidity *LiquidityMetrics,
+	liquidityThresh float64,
+) float64 {
+	// Factor 1: Alignment between imbalance indicators
+	alignmentScore := s.calculateAlignmentScore(imbalance)
+
+	// Factor 2: Liquidity quality (tight spread, good depth)
+	liquidityScore := s.calculateLiquidityScoreWithThreshold(liquidity, liquidityThresh)
+
+	// Factor 3: Price pressure strength
+	pressureScore := math.Abs(imbalance.PricePressure)
+
+	// Weighted average
+	confidence := (alignmentScore*0.4 + liquidityScore*0.3 + pressureScore*0.3)
+
+	// Clamp to [0, 1]
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+	if confidence < 0.0 {
+		confidence = 0.0
+	}
+
+	return confidence
+}
+
+// calculateLiquidityScoreWithThreshold assesses order book liquidity quality with custom threshold.
+func (s *SignalGenerator) calculateLiquidityScoreWithThreshold(liquidity *LiquidityMetrics, liquidityThresh float64) float64 {
+	// Good liquidity = tight spread + balanced depth + low market impact
+	spreadScore := 1.0 - math.Min(liquidity.SpreadBPS/100.0, 1.0)
+	depthScore := depthBalance(liquidity.BidDepth, liquidity.AskDepth)
+	impactScore := 1.0 - math.Min(liquidity.MarketImpact/liquidityThresh, 1.0)
+
+	return (spreadScore + depthScore + impactScore) / 3.0
 }
 
 // SetThresholds updates the signal generation thresholds.

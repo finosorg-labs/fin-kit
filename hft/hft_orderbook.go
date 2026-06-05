@@ -80,11 +80,25 @@ func (h *HFTOrderBook) OnOrderUpdate(update *OrderUpdate) (*Signal, error) {
 
 	h.lastUpdate = update.Timestamp
 
-	// Calculate metrics
-	h.lastImbalance = h.imbalance.Calculate()
-	h.lastLiquidity = h.liquidity.Calculate()
+	// Calculate metrics in parallel
+	// Note: For sub-microsecond operations, goroutine overhead may exceed benefits.
+	// Benchmark to verify performance improvement in production workloads.
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	// Generate signal
+	go func() {
+		defer wg.Done()
+		h.lastImbalance = h.imbalance.Calculate()
+	}()
+
+	go func() {
+		defer wg.Done()
+		h.lastLiquidity = h.liquidity.Calculate()
+	}()
+
+	wg.Wait()
+
+	// Generate signal (depends on both metrics)
 	h.lastSignal = h.signalGen.Generate(h.lastImbalance, h.lastLiquidity, update.Timestamp)
 
 	// Update risk metrics

@@ -3,6 +3,8 @@ package hft
 
 import (
 	"sync"
+
+	"github.com/finosorg-labs/platform"
 )
 
 // PositionTracker tracks trading positions and exposure.
@@ -61,10 +63,96 @@ func (p *PositionTracker) updateBuy(quantity int64, price float64) {
 		}
 	} else {
 		// Adding to long or opening long
-		totalCost := float64(p.position)*p.avgEntryPrice + float64(quantity)*price
+		// Use BigFloat for precision
+		posVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer posVal.Destroy()
+
+		avgPrice, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer avgPrice.Destroy()
+
+		qtyVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer qtyVal.Destroy()
+
+		priceVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer priceVal.Destroy()
+
+		cost1, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer cost1.Destroy()
+
+		cost2, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer cost2.Destroy()
+
+		totalCost, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer totalCost.Destroy()
+
+		newPos, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer newPos.Destroy()
+
+		result, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer result.Destroy()
+
+		if err := posVal.SetInt64(p.position); err != nil {
+			return
+		}
+		if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
+			return
+		}
+		if err := qtyVal.SetInt64(quantity); err != nil {
+			return
+		}
+		if err := priceVal.SetFloat64(price); err != nil {
+			return
+		}
+
+		// totalCost = position * avgEntryPrice + quantity * price
+		if err := cost1.Mul(posVal, avgPrice); err != nil {
+			return
+		}
+		if err := cost2.Mul(qtyVal, priceVal); err != nil {
+			return
+		}
+		if err := totalCost.Add(cost1, cost2); err != nil {
+			return
+		}
+
 		p.position += quantity
 		if p.position > 0 {
-			p.avgEntryPrice = totalCost / float64(p.position)
+			if err := newPos.SetInt64(p.position); err != nil {
+				return
+			}
+			if err := result.Div(totalCost, newPos); err != nil {
+				return
+			}
+			if p.avgEntryPrice, err = result.Float64(); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -94,10 +182,96 @@ func (p *PositionTracker) updateSell(quantity int64, price float64) {
 		}
 	} else {
 		// Adding to short or opening short
-		totalCost := float64(-p.position)*p.avgEntryPrice + float64(quantity)*price
+		// Use BigFloat for precision
+		posVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer posVal.Destroy()
+
+		avgPrice, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer avgPrice.Destroy()
+
+		qtyVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer qtyVal.Destroy()
+
+		priceVal, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer priceVal.Destroy()
+
+		cost1, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer cost1.Destroy()
+
+		cost2, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer cost2.Destroy()
+
+		totalCost, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer totalCost.Destroy()
+
+		newPos, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer newPos.Destroy()
+
+		result, err := platform.NewBigFloat()
+		if err != nil {
+			return
+		}
+		defer result.Destroy()
+
+		if err := posVal.SetInt64(-p.position); err != nil {
+			return
+		}
+		if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
+			return
+		}
+		if err := qtyVal.SetInt64(quantity); err != nil {
+			return
+		}
+		if err := priceVal.SetFloat64(price); err != nil {
+			return
+		}
+
+		// totalCost = -position * avgEntryPrice + quantity * price
+		if err := cost1.Mul(posVal, avgPrice); err != nil {
+			return
+		}
+		if err := cost2.Mul(qtyVal, priceVal); err != nil {
+			return
+		}
+		if err := totalCost.Add(cost1, cost2); err != nil {
+			return
+		}
+
 		p.position -= quantity
 		if p.position < 0 {
-			p.avgEntryPrice = totalCost / float64(-p.position)
+			if err := newPos.SetInt64(-p.position); err != nil {
+				return
+			}
+			if err := result.Div(totalCost, newPos); err != nil {
+				return
+			}
+			if p.avgEntryPrice, err = result.Float64(); err != nil {
+				return
+			}
 		}
 	}
 }
