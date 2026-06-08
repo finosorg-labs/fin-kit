@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	coreob "github.com/finosorg-labs/exchange-c/orderbook"
+	hashsdk "github.com/finosorg-labs/hash-c/sdk"
 )
 
 // OrderBook wraps the core order book with exchange-specific functionality.
@@ -27,11 +28,11 @@ import (
 // Concurrency: Thread-safe via mutex.
 type OrderBook struct {
 	mu             sync.RWMutex
-	coreBook     *coreob.OrderBook
+	coreBook       *coreob.OrderBook
 	symbol         string
 	symbolID       uint32
 	selfTradeCheck *SelfTradeCheck
-	orderAccounts  map[int64]string // orderID -> accountID mapping
+	orderAccounts  *hashsdk.Int64Map[string] // orderID -> accountID mapping
 }
 
 // NewOrderBook creates a new exchange order book.
@@ -41,7 +42,7 @@ func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck
 		symbol:         symbol,
 		symbolID:       symbolID,
 		selfTradeCheck: selfTradeCheck,
-		orderAccounts:  make(map[int64]string),
+		orderAccounts:  hashsdk.NewInt64Map[string](),
 	}
 }
 
@@ -70,7 +71,7 @@ func (ob *OrderBook) AddOrder(order *Order) error {
 	}
 
 	// Track account mapping
-	ob.orderAccounts[order.OrderID] = order.AccountID
+	ob.orderAccounts.Set(order.OrderID, order.AccountID)
 
 	// Register for self-trade prevention
 	ob.selfTradeCheck.RegisterOrder(order.OrderID, order.AccountID, order.Side)
@@ -84,7 +85,7 @@ func (ob *OrderBook) RemoveOrder(orderID int64) error {
 	defer ob.mu.Unlock()
 
 	// Get account ID before removal
-	accountID, exists := ob.orderAccounts[orderID]
+	accountID, exists := ob.orderAccounts.Get(orderID)
 	if !exists {
 		return ErrOrderNotFound
 	}
@@ -98,7 +99,7 @@ func (ob *OrderBook) RemoveOrder(orderID int64) error {
 	ob.selfTradeCheck.UnregisterOrder(orderID, accountID)
 
 	// Remove account mapping
-	delete(ob.orderAccounts, orderID)
+	ob.orderAccounts.Delete(orderID)
 
 	return nil
 }
@@ -110,8 +111,7 @@ func (ob *OrderBook) UpdateOrder(orderID int64, newQuantity int64) error {
 	defer ob.mu.Unlock()
 
 	// Verify order exists
-	_, exists := ob.orderAccounts[orderID]
-	if !exists {
+	if !ob.orderAccounts.Contains(orderID) {
 		return ErrOrderNotFound
 	}
 
@@ -234,7 +234,7 @@ func (ob *OrderBook) Clear() {
 	defer ob.mu.Unlock()
 
 	ob.coreBook.Clear()
-	ob.orderAccounts = make(map[int64]string)
+	ob.orderAccounts.Clear()
 }
 
 // GetSymbol returns the symbol for this order book.
@@ -252,32 +252,32 @@ func (ob *OrderBook) GetAccountID(orderID int64) (string, bool) {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
 
-	accountID, exists := ob.orderAccounts[orderID]
-	return accountID, exists
+	return ob.orderAccounts.Get(orderID)
 }
 
-// GetAccountMap returns a copy of the account mapping for matching.
+// GetAccountMap returns a copy of the account mapping.
 func (ob *OrderBook) GetAccountMap() map[int64]string {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
 
-	accountMap := make(map[int64]string, len(ob.orderAccounts))
-	for orderID, accountID := range ob.orderAccounts {
+	accountMap := make(map[int64]string, ob.orderAccounts.Len())
+	ob.orderAccounts.ForEach(func(orderID int64, accountID string) bool {
 		accountMap[orderID] = accountID
-	}
+		return true
+	})
 	return accountMap
 }
 
 // OrderBookStats contains statistics about the order book.
 type OrderBookStats struct {
-	Symbol       string
-	SymbolID     uint32
-	BidLevels    int
-	AskLevels    int
-	TotalOrders  int
-	BestBid      int64
-	BestAsk      int64
-	Spread       int64
+	Symbol      string
+	SymbolID    uint32
+	BidLevels   int
+	AskLevels   int
+	TotalOrders int
+	BestBid     int64
+	BestAsk     int64
+	Spread      int64
 }
 
 // GetStats returns statistics about the order book.
@@ -304,7 +304,7 @@ func (ob *OrderBook) GetStats() OrderBookStats {
 		BidLevels:   ob.coreBook.GetBidLevels(),
 		AskLevels:   ob.coreBook.GetAskLevels(),
 		TotalOrders: ob.coreBook.GetOrderCount(),
-		BestBid:   bestBidPrice,
+		BestBid:     bestBidPrice,
 		BestAsk:     bestAskPrice,
 		Spread:      ob.coreBook.GetSpread(),
 	}
