@@ -48,7 +48,6 @@ func (r *TradeReporter) RegisterOrder(order *Order) {
 		FilledQty:    0,
 		RemainingQty: order.Quantity,
 		TotalValue:   0,
-		Trades:       make([]*Trade, 0),
 	}
 }
 

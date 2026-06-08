@@ -15,7 +15,7 @@ import (
 // Concurrency: Thread-safe via mutex.
 type SelfTradeCheck struct {
 	mu            sync.RWMutex
-	accountOrders map[string]map[int64]*accountOrderInfo // accountID -> orderID -> order info
+	accountOrders map[string]accountOrderSet // accountID -> order info set
 }
 
 // accountOrderInfo tracks essential order information for self-trade detection.
@@ -24,10 +24,15 @@ type accountOrderInfo struct {
 	Side    Side
 }
 
+type accountOrderSet struct {
+	single accountOrderInfo
+	orders map[int64]accountOrderInfo
+}
+
 // NewSelfTradeCheck creates a new self-trade checker.
 func NewSelfTradeCheck() *SelfTradeCheck {
 	return &SelfTradeCheck{
-		accountOrders: make(map[string]map[int64]*accountOrderInfo),
+		accountOrders: make(map[string]accountOrderSet),
 	}
 }
 
@@ -37,16 +42,24 @@ func (s *SelfTradeCheck) RegisterOrder(orderID int64, accountID string, side Sid
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	orders, exists := s.accountOrders[accountID]
+	info := accountOrderInfo{OrderID: orderID, Side: side}
+	set, exists := s.accountOrders[accountID]
 	if !exists {
-		orders = make(map[int64]*accountOrderInfo)
-		s.accountOrders[accountID] = orders
+		set.single = info
+		s.accountOrders[accountID] = set
+		return
 	}
-
-	orders[orderID] = &accountOrderInfo{
-		OrderID: orderID,
-		Side:    side,
+	if set.orders == nil {
+		if set.single.OrderID == orderID {
+			set.single = info
+			s.accountOrders[accountID] = set
+			return
+		}
+		set.orders = make(map[int64]accountOrderInfo, 2)
+		set.orders[set.single.OrderID] = set.single
 	}
+	set.orders[orderID] = info
+	s.accountOrders[accountID] = set
 }
 
 // UnregisterOrder removes an order from self-trade tracking.
@@ -55,17 +68,29 @@ func (s *SelfTradeCheck) UnregisterOrder(orderID int64, accountID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	orders, exists := s.accountOrders[accountID]
+	set, exists := s.accountOrders[accountID]
 	if !exists {
 		return
 	}
-
-	delete(orders, orderID)
-
-	// Clean up empty account entries
-	if len(orders) == 0 {
-		delete(s.accountOrders, accountID)
+	if set.orders == nil {
+		if set.single.OrderID == orderID {
+			delete(s.accountOrders, accountID)
+		}
+		return
 	}
+
+	delete(set.orders, orderID)
+	if len(set.orders) == 0 {
+		delete(s.accountOrders, accountID)
+		return
+	}
+	if len(set.orders) == 1 {
+		for _, info := range set.orders {
+			set.single = info
+		}
+		set.orders = nil
+	}
+	s.accountOrders[accountID] = set
 }
 
 // Check checks if two orders would result in a self-trade.
@@ -92,8 +117,12 @@ func (s *SelfTradeCheck) GetAccountOrders(accountID string) []int64 {
 		return nil
 	}
 
-	result := make([]int64, 0, len(orders))
-	for orderID := range orders {
+	if orders.orders == nil {
+		return []int64{orders.single.OrderID}
+	}
+
+	result := make([]int64, 0, len(orders.orders))
+	for orderID := range orders.orders {
 		result = append(result, orderID)
 	}
 	return result
@@ -109,8 +138,15 @@ func (s *SelfTradeCheck) GetAccountOrdersBySide(accountID string, side Side) []i
 		return nil
 	}
 
-	result := make([]int64, 0, len(orders))
-	for _, info := range orders {
+	if orders.orders == nil {
+		if orders.single.Side == side {
+			return []int64{orders.single.OrderID}
+		}
+		return nil
+	}
+
+	result := make([]int64, 0, len(orders.orders))
+	for _, info := range orders.orders {
 		if info.Side == side {
 			result = append(result, info.OrderID)
 		}
@@ -123,7 +159,7 @@ func (s *SelfTradeCheck) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.accountOrders = make(map[string]map[int64]*accountOrderInfo)
+	s.accountOrders = make(map[string]accountOrderSet)
 }
 
 // Stats returns statistics about tracked orders.
@@ -142,7 +178,11 @@ func (s *SelfTradeCheck) GetStats() SelfTradeStats {
 	}
 
 	for _, orders := range s.accountOrders {
-		stats.TotalOrders += len(orders)
+		if orders.orders == nil {
+			stats.TotalOrders++
+			continue
+		}
+		stats.TotalOrders += len(orders.orders)
 	}
 
 	return stats
