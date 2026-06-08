@@ -571,6 +571,71 @@ func BenchmarkMatchOrder(b *testing.B) {
 	}
 }
 
+func BenchmarkSubmitOrderPreallocated(b *testing.B) {
+	engine := NewMatchingEngine(WithMatchingEngineOrderCapacity(b.N + 100))
+	defer engine.Close()
+	// Pre-populate with some orders
+	for i := int64(1); i <= 100; i++ {
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100 + (i % 10),
+			Quantity:     10,
+			Side:         SideBuy,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		order := &Order{
+			OrderID:      int64(1000 + i),
+			AccountID:    fmt.Sprintf("BENCH%d", i),
+			Price:        95,
+			Quantity:     5,
+			Side:         SideSell,
+			Type:         OrderTypeLimit,
+			RemainingQty: 5,
+		}
+		engine.SubmitOrder(order)
+	}
+}
+
+func BenchmarkMatchOrderPreallocated(b *testing.B) {
+	engine := NewMatchingEngine(WithMatchingEngineOrderCapacity(b.N + 1000))
+	defer engine.Close()
+
+	// Pre-populate with resting orders
+	for i := int64(1); i <= 1000; i++ {
+		order := &Order{
+			OrderID:      i,
+			AccountID:    fmt.Sprintf("ACC%d", i),
+			Price:        100,
+			Quantity:     10,
+			Side:         SideSell,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		order := &Order{
+			OrderID:      int64(10000 + i),
+			AccountID:    fmt.Sprintf("BENCH%d", i),
+			Price:        100,
+			Quantity:     10,
+			Side:         SideBuy,
+			Type:         OrderTypeLimit,
+			RemainingQty: 10,
+		}
+		engine.SubmitOrder(order)
+	}
+}
+
 // BenchmarkSelfTradeCheck benchmarks self-trade detection.
 func BenchmarkSelfTradeCheck(b *testing.B) {
 	stc := NewSelfTradeCheck()

@@ -35,14 +35,45 @@ type OrderBook struct {
 	orderAccounts  *hashsdk.Int64Map[string] // orderID -> accountID mapping
 }
 
+// OrderBookOption configures an exchange order book during creation.
+type OrderBookOption func(*orderBookConfig)
+
+type orderBookConfig struct {
+	orderCapacity int
+}
+
+// WithOrderCapacity sets the expected active order capacity for internal maps.
+func WithOrderCapacity(capacity int) OrderBookOption {
+	return func(cfg *orderBookConfig) {
+		if capacity > 0 {
+			cfg.orderCapacity = capacity
+		}
+	}
+}
+
 // NewOrderBook creates a new exchange order book.
-func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck) *OrderBook {
+func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck, opts ...OrderBookOption) *OrderBook {
+	cfg := orderBookConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	coreOpts := []coreob.Option(nil)
+	if cfg.orderCapacity > 0 {
+		coreOpts = append(coreOpts, coreob.WithInitialCapacity(cfg.orderCapacity))
+	}
+
+	orderAccounts := hashsdk.NewInt64Map[string]()
+	if cfg.orderCapacity > 0 {
+		orderAccounts = hashsdk.NewInt64MapWithCapacity[string](cfg.orderCapacity)
+	}
+
 	return &OrderBook{
-		coreBook:       coreob.NewOrderBook(symbol, symbolID),
+		coreBook:       coreob.NewOrderBook(symbol, symbolID, coreOpts...),
 		symbol:         symbol,
 		symbolID:       symbolID,
 		selfTradeCheck: selfTradeCheck,
-		orderAccounts:  hashsdk.NewInt64Map[string](),
+		orderAccounts:  orderAccounts,
 	}
 }
 

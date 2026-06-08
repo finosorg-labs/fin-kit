@@ -31,8 +31,13 @@ type trackedOrder struct {
 
 // NewTradeReporter creates a new trade reporter.
 func NewTradeReporter() *TradeReporter {
+	return NewTradeReporterWithCapacity(0)
+}
+
+// NewTradeReporterWithCapacity creates a new trade reporter with pre-allocated order capacity.
+func NewTradeReporterWithCapacity(capacity int) *TradeReporter {
 	return &TradeReporter{
-		orders: make(map[int64]*trackedOrder),
+		orders: make(map[int64]*trackedOrder, capacity),
 	}
 }
 
@@ -271,12 +276,12 @@ func (r *TradeReporter) getFillType(report *ExecutionReport) FillType {
 
 // TradeReporterStats contains statistics about tracked orders and trades.
 type TradeReporterStats struct {
-	TotalOrders     int
-	ActiveOrders    int
-	FilledOrders    int
-	CanceledOrders  int
-	RejectedOrders  int
-	TotalTrades     int64
+	TotalOrders    int
+	ActiveOrders   int
+	FilledOrders   int
+	CanceledOrders int
+	RejectedOrders int
+	TotalTrades    int64
 }
 
 // GetStats returns statistics about tracked orders and trades.

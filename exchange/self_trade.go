@@ -31,8 +31,13 @@ type accountOrderSet struct {
 
 // NewSelfTradeCheck creates a new self-trade checker.
 func NewSelfTradeCheck() *SelfTradeCheck {
+	return NewSelfTradeCheckWithCapacity(0)
+}
+
+// NewSelfTradeCheckWithCapacity creates a new self-trade checker with pre-allocated account capacity.
+func NewSelfTradeCheckWithCapacity(capacity int) *SelfTradeCheck {
 	return &SelfTradeCheck{
-		accountOrders: make(map[string]accountOrderSet),
+		accountOrders: make(map[string]accountOrderSet, capacity),
 	}
 }
 

@@ -63,12 +63,34 @@ type MatchingEngine struct {
 	orderMatcher   *OrderMatcher
 	orderIDCounter int64
 	running        bool
+	orderCapacity  int
+}
+
+// MatchingEngineOption configures a matching engine during creation.
+type MatchingEngineOption func(*matchingEngineConfig)
+
+type matchingEngineConfig struct {
+	orderCapacity int
+}
+
+// WithMatchingEngineOrderCapacity sets the expected active order capacity for engine-owned data structures.
+func WithMatchingEngineOrderCapacity(capacity int) MatchingEngineOption {
+	return func(cfg *matchingEngineConfig) {
+		if capacity > 0 {
+			cfg.orderCapacity = capacity
+		}
+	}
 }
 
 // NewMatchingEngine creates a new matching engine.
-func NewMatchingEngine() *MatchingEngine {
-	selfTradeCheck := NewSelfTradeCheck()
-	tradeReporter := NewTradeReporter()
+func NewMatchingEngine(opts ...MatchingEngineOption) *MatchingEngine {
+	cfg := matchingEngineConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	selfTradeCheck := NewSelfTradeCheckWithCapacity(cfg.orderCapacity)
+	tradeReporter := NewTradeReporterWithCapacity(cfg.orderCapacity)
 	orderMatcher := NewOrderMatcher(selfTradeCheck, tradeReporter)
 
 	return &MatchingEngine{
@@ -77,6 +99,7 @@ func NewMatchingEngine() *MatchingEngine {
 		tradeReporter:  tradeReporter,
 		orderMatcher:   orderMatcher,
 		running:        true,
+		orderCapacity:  cfg.orderCapacity,
 	}
 }
 
@@ -304,7 +327,7 @@ func (e *MatchingEngine) getOrCreateOrderBook(order *Order) (*OrderBook, error) 
 
 	// Create new order book
 	symbolID := uint32(len(e.orderBooks) + 1)
-	ob = NewOrderBook(symbol, symbolID, e.selfTradeCheck)
+	ob = NewOrderBook(symbol, symbolID, e.selfTradeCheck, WithOrderCapacity(e.orderCapacity))
 	e.orderBooks[symbol] = ob
 
 	return ob, nil
