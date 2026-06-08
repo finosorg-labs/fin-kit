@@ -108,69 +108,19 @@ func (m *OrderMatcher) Match(order *Order, ob *coreob.OrderBook, lookupAccount a
 func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	trades := make([]*Trade, 0)
 	remaining := order.Quantity
-
-	// Get orders from opposite side
-	var levels []*coreob.PriceLevel
-	if order.Side == SideBuy {
-		levels = ob.GetTopNAsks(m.maxDepthLevels)
-	} else {
-		levels = ob.GetTopNBids(m.maxDepthLevels)
-	}
-
-	// Check for empty order book
-	if len(levels) == 0 {
+	bestLevel := m.bestOppositeLevel(order, ob)
+	if bestLevel == nil {
 		order.CanceledQty = remaining
 		order.RemainingQty = 0
 		return trades, nil
 	}
 
-	// Match against available liquidity
-	for _, level := range levels {
-		if level == nil {
-			continue
-		}
-		if remaining <= 0 {
-			break
-		}
-
-		levelOrders := level.Orders
-		for _, restingOrder := range levelOrders {
-			if restingOrder == nil {
-				continue
-			}
-			if remaining <= 0 {
-				break
-			}
-
-			// Get account ID from mapping
-			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
-			if !exists {
-				continue
-			}
-
-			// Check self-trade
-			if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
-				continue
-			}
-
-			// Calculate match quantity
-			matchQty := remaining
-			if restingOrder.Quantity < matchQty {
-				matchQty = restingOrder.Quantity
-			}
-
-			// Create trade
-			trade := m.createTrade(order, restingOrder, restingAccountID, matchQty, level.Price)
-			trades = append(trades, trade)
-
-			// Update quantities
-			remaining -= matchQty
-			order.FilledQty += matchQty
-			order.RemainingQty = remaining
-		}
+	remaining = m.matchLevel(order, bestLevel, lookupAccount, remaining, &trades)
+	if remaining > 0 {
+		levels := m.topOppositeLevels(order, ob)
+		remaining = m.matchLevels(order, levels, bestLevel, lookupAccount, remaining, &trades, false)
 	}
 
-	// Market orders must be fully filled
 	if remaining > 0 {
 		order.CanceledQty = remaining
 		order.RemainingQty = 0
@@ -213,69 +163,15 @@ func (m *OrderMatcher) matchIOCOrder(order *Order, ob *coreob.OrderBook, lookupA
 func (m *OrderMatcher) matchLimitOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	trades := make([]*Trade, 0)
 	remaining := order.Quantity
-
-	// Get orders from opposite side
-	var levels []*coreob.PriceLevel
-	if order.Side == SideBuy {
-		levels = ob.GetTopNAsks(m.maxDepthLevels)
-	} else {
-		levels = ob.GetTopNBids(m.maxDepthLevels)
-	}
-
-	// Empty order book is valid - just return no trades
-	if len(levels) == 0 {
+	bestLevel := m.bestOppositeLevel(order, ob)
+	if bestLevel == nil || !m.isPriceMatch(order, bestLevel.Price) {
 		return trades, nil
 	}
 
-	// Match against price levels
-	for _, level := range levels {
-		if level == nil {
-			continue
-		}
-		if remaining <= 0 {
-			break
-		}
-
-		// Check price compatibility
-		if !m.isPriceMatch(order, level.Price) {
-			break
-		}
-
-		levelOrders := level.Orders
-		for _, restingOrder := range levelOrders {
-			if restingOrder == nil {
-				continue
-			}
-			if remaining <= 0 {
-				break
-			}
-
-			// Get account ID from mapping
-			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
-			if !exists {
-				continue
-			}
-
-			// Check self-trade
-			if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
-				continue
-			}
-
-			// Calculate match quantity
-			matchQty := remaining
-			if restingOrder.Quantity < matchQty {
-				matchQty = restingOrder.Quantity
-			}
-
-			// Create trade
-			trade := m.createTrade(order, restingOrder, restingAccountID, matchQty, level.Price)
-			trades = append(trades, trade)
-
-			// Update quantities
-			remaining -= matchQty
-			order.FilledQty += matchQty
-			order.RemainingQty = remaining
-		}
+	remaining = m.matchLevel(order, bestLevel, lookupAccount, remaining, &trades)
+	if remaining > 0 {
+		levels := m.topOppositeLevels(order, ob)
+		remaining = m.matchLevels(order, levels, bestLevel, lookupAccount, remaining, &trades, true)
 	}
 
 	return trades, nil
@@ -287,6 +183,88 @@ func (m *OrderMatcher) matchIcebergOrder(order *Order, ob *coreob.OrderBook, loo
 	// Match using visible quantity logic
 	// For now, treat as limit order - iceberg display logic handled by orderbook
 	return m.matchLimitOrder(order, ob, lookupAccount)
+}
+
+func (m *OrderMatcher) bestOppositeLevel(order *Order, ob *coreob.OrderBook) *coreob.PriceLevel {
+	if order.Side == SideBuy {
+		return ob.GetBestAsk()
+	}
+	return ob.GetBestBid()
+}
+
+func (m *OrderMatcher) topOppositeLevels(order *Order, ob *coreob.OrderBook) []*coreob.PriceLevel {
+	if order.Side == SideBuy {
+		return ob.GetTopNAsks(m.maxDepthLevels)
+	}
+	return ob.GetTopNBids(m.maxDepthLevels)
+}
+
+func (m *OrderMatcher) matchLevels(
+	order *Order,
+	levels []*coreob.PriceLevel,
+	skipLevel *coreob.PriceLevel,
+	lookupAccount accountLookup,
+	remaining int64,
+	trades *[]*Trade,
+	checkPrice bool,
+) int64 {
+	for _, level := range levels {
+		if level == nil || level == skipLevel {
+			continue
+		}
+		if remaining <= 0 {
+			break
+		}
+		if checkPrice && !m.isPriceMatch(order, level.Price) {
+			break
+		}
+		remaining = m.matchLevel(order, level, lookupAccount, remaining, trades)
+	}
+	return remaining
+}
+
+func (m *OrderMatcher) matchLevel(
+	order *Order,
+	level *coreob.PriceLevel,
+	lookupAccount accountLookup,
+	remaining int64,
+	trades *[]*Trade,
+) int64 {
+	for node := level.Head; node != nil; node = node.Next {
+		restingOrder := node.Order
+		if restingOrder == nil {
+			continue
+		}
+		if remaining <= 0 {
+			break
+		}
+
+		restingAccountID, exists := lookupAccount(restingOrder.OrderID)
+		if !exists {
+			continue
+		}
+
+		// Check self-trade
+		if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
+			continue
+		}
+
+		// Calculate match quantity
+		matchQty := remaining
+		if restingOrder.Quantity < matchQty {
+			matchQty = restingOrder.Quantity
+		}
+
+		// Create trade
+		trade := m.createTrade(order, restingOrder, restingAccountID, matchQty, level.Price)
+		*trades = append(*trades, trade)
+
+		// Update quantities
+		remaining -= matchQty
+		order.FilledQty += matchQty
+		order.RemainingQty = remaining
+	}
+	return remaining
 }
 
 // createTrade creates a trade between two orders.
@@ -328,17 +306,21 @@ func (m *OrderMatcher) isPriceMatch(order *Order, levelPrice int64) bool {
 // getAvailableLiquidity calculates available liquidity for an order.
 func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) int64 {
 	available := int64(0)
-
-	// Get orders from opposite side
-	var levels []*coreob.PriceLevel
-	if order.Side == SideBuy {
-		levels = ob.GetTopNAsks(100)
-	} else {
-		levels = ob.GetTopNBids(100)
+	bestLevel := m.bestOppositeLevel(order, ob)
+	if bestLevel == nil {
+		return 0
 	}
 
-	// Sum available quantity at compatible prices
+	available = m.addAvailableLiquidity(order, bestLevel, lookupAccount, available)
+	if available >= order.Quantity {
+		return available
+	}
+
+	levels := m.topOppositeLevels(order, ob)
 	for _, level := range levels {
+		if level == nil || level == bestLevel {
+			continue
+		}
 		// Check price compatibility for limit orders
 		if order.Type == OrderTypeLimit || order.Type == OrderTypeFOK {
 			if !m.isPriceMatch(order, level.Price) {
@@ -346,27 +328,42 @@ func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook,
 			}
 		}
 
-		for _, restingOrder := range level.Orders {
-			// Get account ID from mapping
-			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
-			if !exists {
-				continue
-			}
-
-			// Skip self-trades
-			if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
-				continue
-			}
-
-			available += restingOrder.Quantity
-
-			// Stop if we have enough
-			if available >= order.Quantity {
-				return available
-			}
+		available = m.addAvailableLiquidity(order, level, lookupAccount, available)
+		if available >= order.Quantity {
+			return available
 		}
 	}
 
+	return available
+}
+
+func (m *OrderMatcher) addAvailableLiquidity(
+	order *Order,
+	level *coreob.PriceLevel,
+	lookupAccount accountLookup,
+	available int64,
+) int64 {
+	for node := level.Head; node != nil; node = node.Next {
+		restingOrder := node.Order
+		if restingOrder == nil {
+			continue
+		}
+
+		restingAccountID, exists := lookupAccount(restingOrder.OrderID)
+		if !exists {
+			continue
+		}
+
+		// Skip self-trades
+		if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
+			continue
+		}
+
+		available += restingOrder.Quantity
+		if available >= order.Quantity {
+			return available
+		}
+	}
 	return available
 }
 
