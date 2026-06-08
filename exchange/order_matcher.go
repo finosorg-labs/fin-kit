@@ -13,6 +13,8 @@ import (
 // generates trades, and handles different order types.
 //
 // Concurrency: Not thread-safe. Caller must ensure mutual exclusion.
+type accountLookup func(orderID int64) (string, bool)
+
 type OrderMatcher struct {
 	selfTradeCheck *SelfTradeCheck
 	tradeReporter  *TradeReporter
@@ -69,12 +71,12 @@ func (m *OrderMatcher) SetMaxDepthLevels(levels int) {
 // Parameters:
 //   - order: Incoming order to match
 //   - ob: Order book containing resting orders
-//   - accountMap: Mapping of orderID to accountID for self-trade prevention
+//   - lookupAccount: Mapping of orderID to accountID for self-trade prevention
 //
 // Returns:
 //   - []*Trade: Trades generated from matching
 //   - error: Error if matching fails
-func (m *OrderMatcher) Match(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
+func (m *OrderMatcher) Match(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	if order == nil {
 		return nil, ErrNilOrder
 	}
@@ -87,15 +89,15 @@ func (m *OrderMatcher) Match(order *Order, ob *coreob.OrderBook, accountMap map[
 	// Handle different order types
 	switch order.Type {
 	case OrderTypeMarket:
-		return m.matchMarketOrder(order, ob, accountMap)
+		return m.matchMarketOrder(order, ob, lookupAccount)
 	case OrderTypeFOK:
-		return m.matchFOKOrder(order, ob, accountMap)
+		return m.matchFOKOrder(order, ob, lookupAccount)
 	case OrderTypeIOC:
-		return m.matchIOCOrder(order, ob, accountMap)
+		return m.matchIOCOrder(order, ob, lookupAccount)
 	case OrderTypeLimit:
-		return m.matchLimitOrder(order, ob, accountMap)
+		return m.matchLimitOrder(order, ob, lookupAccount)
 	case OrderTypeIceberg:
-		return m.matchIcebergOrder(order, ob, accountMap)
+		return m.matchIcebergOrder(order, ob, lookupAccount)
 	default:
 		return nil, ErrInvalidOrderType
 	}
@@ -103,7 +105,7 @@ func (m *OrderMatcher) Match(order *Order, ob *coreob.OrderBook, accountMap map[
 
 // matchMarketOrder matches a market order at best available price.
 // Market orders are fully filled or canceled if insufficient liquidity.
-func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
+func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	trades := make([]*Trade, 0)
 	remaining := order.Quantity
 
@@ -140,8 +142,8 @@ func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, acco
 				break
 			}
 
-		// Get account ID from mapping
-			restingAccountID, exists := accountMap[restingOrder.OrderID]
+			// Get account ID from mapping
+			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
 			if !exists {
 				continue
 			}
@@ -152,7 +154,7 @@ func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, acco
 			}
 
 			// Calculate match quantity
-		matchQty := remaining
+			matchQty := remaining
 			if restingOrder.Quantity < matchQty {
 				matchQty = restingOrder.Quantity
 			}
@@ -179,20 +181,20 @@ func (m *OrderMatcher) matchMarketOrder(order *Order, ob *coreob.OrderBook, acco
 
 // matchFOKOrder matches a Fill-Or-Kill order.
 // FOK orders must be completely filled immediately or canceled entirely.
-func (m *OrderMatcher) matchFOKOrder(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
+func (m *OrderMatcher) matchFOKOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	// First check if sufficient liquidity exists
-	available := m.getAvailableLiquidity(order, ob, accountMap)
+	available := m.getAvailableLiquidity(order, ob, lookupAccount)
 	if available < order.Quantity {
 		return nil, ErrInsufficientQty
 	}
 	// Match as limit order since we confirmed sufficient liquidity
-	return m.matchLimitOrder(order, ob, accountMap)
+	return m.matchLimitOrder(order, ob, lookupAccount)
 }
 
 // matchIOCOrder matches an Immediate-Or-Cancel order.
 // IOC orders fill available quantity immediately and cancel the rest.
-func (m *OrderMatcher) matchIOCOrder(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
-	trades, err := m.matchLimitOrder(order, ob, accountMap)
+func (m *OrderMatcher) matchIOCOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
+	trades, err := m.matchLimitOrder(order, ob, lookupAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +210,7 @@ func (m *OrderMatcher) matchIOCOrder(order *Order, ob *coreob.OrderBook, account
 
 // matchLimitOrder matches a limit order at specified price or better.
 // Partial fills are allowed, remainder stays in the order book.
-func (m *OrderMatcher) matchLimitOrder(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
+func (m *OrderMatcher) matchLimitOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	trades := make([]*Trade, 0)
 	remaining := order.Quantity
 
@@ -249,12 +251,12 @@ func (m *OrderMatcher) matchLimitOrder(order *Order, ob *coreob.OrderBook, accou
 			}
 
 			// Get account ID from mapping
-			restingAccountID, exists := accountMap[restingOrder.OrderID]
+			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
 			if !exists {
 				continue
 			}
 
-		// Check self-trade
+			// Check self-trade
 			if m.selfTradeCheck.Check(order.AccountID, restingAccountID) {
 				continue
 			}
@@ -281,10 +283,10 @@ func (m *OrderMatcher) matchLimitOrder(order *Order, ob *coreob.OrderBook, accou
 
 // matchIcebergOrder matches an iceberg order with hidden quantity.
 // Only visible quantity is displayed, but matching can fill more.
-func (m *OrderMatcher) matchIcebergOrder(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) ([]*Trade, error) {
+func (m *OrderMatcher) matchIcebergOrder(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) ([]*Trade, error) {
 	// Match using visible quantity logic
 	// For now, treat as limit order - iceberg display logic handled by orderbook
-	return m.matchLimitOrder(order, ob, accountMap)
+	return m.matchLimitOrder(order, ob, lookupAccount)
 }
 
 // createTrade creates a trade between two orders.
@@ -324,7 +326,7 @@ func (m *OrderMatcher) isPriceMatch(order *Order, levelPrice int64) bool {
 }
 
 // getAvailableLiquidity calculates available liquidity for an order.
-func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook, accountMap map[int64]string) int64 {
+func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook, lookupAccount accountLookup) int64 {
 	available := int64(0)
 
 	// Get orders from opposite side
@@ -346,9 +348,9 @@ func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook,
 
 		for _, restingOrder := range level.Orders {
 			// Get account ID from mapping
-			restingAccountID, exists := accountMap[restingOrder.OrderID]
+			restingAccountID, exists := lookupAccount(restingOrder.OrderID)
 			if !exists {
-		continue
+				continue
 			}
 
 			// Skip self-trades
@@ -356,7 +358,7 @@ func (m *OrderMatcher) getAvailableLiquidity(order *Order, ob *coreob.OrderBook,
 				continue
 			}
 
-		available += restingOrder.Quantity
+			available += restingOrder.Quantity
 
 			// Stop if we have enough
 			if available >= order.Quantity {

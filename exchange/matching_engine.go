@@ -109,13 +109,8 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 	if order.Timestamp == 0 {
 		order.Timestamp = time.Now().UnixNano()
 	}
-	// Get account mapping for matching
-	accountMap := ob.GetAccountMap()
-	// Add incoming order to account map for consistency
-	accountMap[order.OrderID] = order.AccountID
-
 	// Try to match the order
-	trades, err := e.orderMatcher.Match(order, ob.coreBook, accountMap)
+	trades, err := e.orderMatcher.Match(order, ob.coreBook, ob.GetAccountID)
 	if err != nil {
 		// Order rejected during matching
 		report, _ := e.tradeReporter.RejectOrder(order.OrderID, err.Error())
