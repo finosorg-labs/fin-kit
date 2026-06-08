@@ -157,7 +157,7 @@ func TestBrokerOrderBookPartialFill(t *testing.T) {
 	// Complete fill: trade remaining 70
 	if err := book.OnTrade(&Trade{
 		BuyOrderID: 1,
-		Price:    100,
+		Price:      100,
 		Quantity:   70,
 		Timestamp:  1002,
 	}); err != nil {
@@ -187,7 +187,7 @@ func TestBrokerOrderBookPartialFill(t *testing.T) {
 
 	if err := book.OnTrade(&Trade{
 		SellOrderID: 2,
-		Price:     101,
+		Price:       101,
 		Quantity:    100,
 		Timestamp:   2001,
 	}); err != nil {
@@ -429,5 +429,92 @@ func TestBrokerOrderBookOnSnapshotEmptyLevels(t *testing.T) {
 	}
 	if len(snapshot.Bids) != 0 || len(snapshot.Asks) != 0 {
 		t.Error("Expected empty order book after snapshot with zero quantities")
+	}
+}
+
+func seedBenchmarkBrokerOrderBook(b *testing.B, levels int) *BrokerOrderBook {
+	b.Helper()
+
+	book := NewBrokerOrderBook("BENCH", 1, 1.0)
+	for i := 0; i < levels; i++ {
+		if err := book.OnOrderIncrement(&OrderIncrement{
+			Type:      OrderInsert,
+			OrderID:   int64(i + 1),
+			Price:     int64(100000 - i),
+			Quantity:  100,
+			Side:      SideBuy,
+			Timestamp: int64(i + 1),
+		}); err != nil {
+			b.Fatalf("insert bid: %v", err)
+		}
+		if err := book.OnOrderIncrement(&OrderIncrement{
+			Type:      OrderInsert,
+			OrderID:   int64(levels + i + 1),
+			Price:     int64(100001 + i),
+			Quantity:  100,
+			Side:      SideSell,
+			Timestamp: int64(levels + i + 1),
+		}); err != nil {
+			b.Fatalf("insert ask: %v", err)
+		}
+	}
+	return book
+}
+
+func BenchmarkBrokerOrderBookOnOrderIncrementInsertDelete(b *testing.B) {
+	book := NewBrokerOrderBook("BENCH", 1, 1.0)
+	defer book.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		orderID := int64(i + 1)
+		if err := book.OnOrderIncrement(&OrderIncrement{
+			Type:      OrderInsert,
+			OrderID:   orderID,
+			Price:     100000,
+			Quantity:  100,
+			Side:      SideBuy,
+			Timestamp: orderID,
+		}); err != nil {
+			b.Fatalf("insert: %v", err)
+		}
+		if err := book.OnOrderIncrement(&OrderIncrement{Type: OrderDelete, OrderID: orderID}); err != nil {
+			b.Fatalf("delete: %v", err)
+		}
+	}
+}
+
+func BenchmarkBrokerOrderBookOnOrderIncrementModify(b *testing.B) {
+	book := seedBenchmarkBrokerOrderBook(b, 1000)
+	defer book.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := book.OnOrderIncrement(&OrderIncrement{
+			Type:     OrderModify,
+			OrderID:  1,
+			Quantity: int64(100 + (i & 1)),
+		}); err != nil {
+			b.Fatalf("modify: %v", err)
+		}
+	}
+}
+
+func BenchmarkBrokerOrderBookGetSnapshot20(b *testing.B) {
+	book := seedBenchmarkBrokerOrderBook(b, 1000)
+	defer book.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		snapshot, err := book.GetSnapshot(20, exchange.OrderBookPrecisionKahan)
+		if err != nil {
+			b.Fatalf("snapshot: %v", err)
+		}
+		if len(snapshot.Bids) != 20 || len(snapshot.Asks) != 20 {
+			b.Fatalf("snapshot length = %d bids, %d asks", len(snapshot.Bids), len(snapshot.Asks))
+		}
 	}
 }

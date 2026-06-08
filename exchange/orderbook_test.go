@@ -15,7 +15,7 @@ func TestEmptyOrderBook(t *testing.T) {
 		AccountID:    "ACC1",
 		Price:        0,
 		Quantity:     10,
-		Side:       SideBuy,
+		Side:         SideBuy,
 		Type:         OrderTypeMarket,
 		RemainingQty: 10,
 	}
@@ -140,7 +140,7 @@ func TestZeroQuantityOrder(t *testing.T) {
 		AccountID:    "ACC1",
 		Price:        100,
 		Quantity:     0,
-		Side:      SideBuy,
+		Side:         SideBuy,
 		Type:         OrderTypeLimit,
 		RemainingQty: 0,
 	}
@@ -263,5 +263,99 @@ func TestOrderMatcherDepthConfiguration(t *testing.T) {
 	m1.SetMaxDepthLevels(-1)
 	if m1.maxDepthLevels != 200 {
 		t.Errorf("Expected depth unchanged (200) for invalid set, got %d", m1.maxDepthLevels)
+	}
+}
+
+func newBenchmarkExchangeOrder(orderID, price int64, side Side) *Order {
+	return &Order{
+		OrderID:      orderID,
+		AccountID:    "ACC1",
+		Symbol:       "BENCH",
+		Price:        price,
+		Quantity:     100,
+		Side:         side,
+		Type:         OrderTypeLimit,
+		RemainingQty: 100,
+	}
+}
+
+func seedBenchmarkExchangeOrderBook(b *testing.B, levels int) *OrderBook {
+	b.Helper()
+
+	ob := NewOrderBook("BENCH", 1, NewSelfTradeCheck())
+	for i := 0; i < levels; i++ {
+		if err := ob.AddOrder(newBenchmarkExchangeOrder(int64(i+1), int64(100000-i), SideBuy)); err != nil {
+			b.Fatalf("add bid: %v", err)
+		}
+		if err := ob.AddOrder(newBenchmarkExchangeOrder(int64(levels+i+1), int64(100001+i), SideSell)); err != nil {
+			b.Fatalf("add ask: %v", err)
+		}
+	}
+	return ob
+}
+
+func BenchmarkOrderBookAddRemoveSameLevel(b *testing.B) {
+	ob := NewOrderBook("BENCH", 1, NewSelfTradeCheck())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		orderID := int64(i + 1)
+		if err := ob.AddOrder(newBenchmarkExchangeOrder(orderID, 100000, SideBuy)); err != nil {
+			b.Fatalf("add order: %v", err)
+		}
+		if err := ob.RemoveOrder(orderID); err != nil {
+			b.Fatalf("remove order: %v", err)
+		}
+	}
+}
+
+func BenchmarkOrderBookUpdateOrder(b *testing.B) {
+	ob := seedBenchmarkExchangeOrderBook(b, 1000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := ob.UpdateOrder(1, int64(100+(i&1))); err != nil {
+			b.Fatalf("update order: %v", err)
+		}
+	}
+}
+
+func BenchmarkOrderBookBestBidAsk(b *testing.B) {
+	ob := seedBenchmarkExchangeOrderBook(b, 1000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if ob.GetBestBid() == nil || ob.GetBestAsk() == nil {
+			b.Fatal("missing best bid/ask")
+		}
+	}
+}
+
+func BenchmarkOrderBookGetDepth20(b *testing.B) {
+	ob := seedBenchmarkExchangeOrderBook(b, 1000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bids, asks := ob.GetDepth(20)
+		if len(bids) != 20 || len(asks) != 20 {
+			b.Fatalf("depth length = %d bids, %d asks", len(bids), len(asks))
+		}
+	}
+}
+
+func BenchmarkOrderBookGetAggregatedDepth20(b *testing.B) {
+	ob := seedBenchmarkExchangeOrderBook(b, 1000)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bids, asks := ob.GetAggregatedDepth(20)
+		if len(bids) != 20 || len(asks) != 20 {
+			b.Fatalf("aggregated depth length = %d bids, %d asks", len(bids), len(asks))
+		}
 	}
 }

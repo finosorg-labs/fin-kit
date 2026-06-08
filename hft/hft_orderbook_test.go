@@ -224,22 +224,84 @@ func TestHFTOrderBook_GetCore(t *testing.T) {
 	}
 }
 
-func BenchmarkHFTOrderBook_OnOrderUpdate(b *testing.B) {
-	ob := NewHFTOrderBook("TEST", 1, 0.01)
+func seedBenchmarkHFTOrderBook(b *testing.B, levels int) *HFTOrderBook {
+	b.Helper()
+
+	ob := NewHFTOrderBook("BENCH", 1, 0.01)
+	for i := 0; i < levels; i++ {
+		if _, err := ob.OnOrderUpdate(&OrderUpdate{
+			Type:      OrderUpdateInsert,
+			OrderID:   int64(i + 1),
+			Price:     int64(100000 - i),
+			Quantity:  100,
+			Side:      SideBuy,
+			Timestamp: int64(i + 1),
+		}); err != nil {
+			b.Fatalf("insert bid: %v", err)
+		}
+		if _, err := ob.OnOrderUpdate(&OrderUpdate{
+			Type:      OrderUpdateInsert,
+			OrderID:   int64(levels + i + 1),
+			Price:     int64(100001 + i),
+			Quantity:  100,
+			Side:      SideSell,
+			Timestamp: int64(levels + i + 1),
+		}); err != nil {
+			b.Fatalf("insert ask: %v", err)
+		}
+	}
+	return ob
+}
+
+func BenchmarkHFTOrderBookOnOrderUpdateInsert(b *testing.B) {
+	ob := NewHFTOrderBook("BENCH", 1, 0.01)
 	defer ob.Close()
 
-	update := &OrderUpdate{
-		Type:      OrderUpdateInsert,
-		OrderID:   1,
-		Price:     1000,
-		Quantity:  100,
-		Side:      SideBuy,
-		Timestamp: time.Now().UnixNano(),
-	}
-
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		update.OrderID = int64(i + 1)
-		_, _ = ob.OnOrderUpdate(update)
+		_, err := ob.OnOrderUpdate(&OrderUpdate{
+			Type:      OrderUpdateInsert,
+			OrderID:   int64(i + 1),
+			Price:     100000,
+			Quantity:  100,
+			Side:      SideBuy,
+			Timestamp: int64(i + 1),
+		})
+		if err != nil {
+			b.Fatalf("insert update: %v", err)
+		}
+	}
+}
+
+func BenchmarkHFTOrderBookOnOrderUpdateModify(b *testing.B) {
+	ob := seedBenchmarkHFTOrderBook(b, 1000)
+	defer ob.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ob.OnOrderUpdate(&OrderUpdate{
+			Type:      OrderUpdateModify,
+			OrderID:   1,
+			Quantity:  int64(100 + (i & 1)),
+			Timestamp: int64(i + 1),
+		})
+		if err != nil {
+			b.Fatalf("modify update: %v", err)
+		}
+	}
+}
+
+func BenchmarkHFTOrderBookGetCachedMetrics(b *testing.B) {
+	ob := seedBenchmarkHFTOrderBook(b, 1000)
+	defer ob.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if ob.GetImbalance() == nil || ob.GetLiquidity() == nil || ob.GetSignal() == nil {
+			b.Fatal("missing cached metrics")
+		}
 	}
 }
