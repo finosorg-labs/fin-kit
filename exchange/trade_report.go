@@ -249,7 +249,9 @@ func (r *TradeReporter) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.orders = make(map[int64]*trackedOrder)
+	for orderID := range r.orders {
+		delete(r.orders, orderID)
+	}
 	r.tradeCounter = 0
 }
 

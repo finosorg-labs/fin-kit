@@ -207,22 +207,22 @@ func (ob *OrderBook) GetAggregatedDepth(levels int) ([]AggregatedLevel, []Aggreg
 	bidLevels := ob.coreBook.GetTopNBids(levels)
 	askLevels := ob.coreBook.GetTopNAsks(levels)
 
-	bids := make([]AggregatedLevel, 0, len(bidLevels))
-	for _, level := range bidLevels {
-		bids = append(bids, AggregatedLevel{
+	bids := make([]AggregatedLevel, len(bidLevels))
+	for i, level := range bidLevels {
+		bids[i] = AggregatedLevel{
 			Price:      level.Price,
 			TotalQty:   level.TotalQty,
 			OrderCount: level.OrderCount,
-		})
+		}
 	}
 
-	asks := make([]AggregatedLevel, 0, len(askLevels))
-	for _, level := range askLevels {
-		asks = append(asks, AggregatedLevel{
+	asks := make([]AggregatedLevel, len(askLevels))
+	for i, level := range askLevels {
+		asks[i] = AggregatedLevel{
 			Price:      level.Price,
 			TotalQty:   level.TotalQty,
 			OrderCount: level.OrderCount,
-		})
+		}
 	}
 
 	return bids, asks

@@ -159,7 +159,9 @@ func (s *SelfTradeCheck) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.accountOrders = make(map[string]accountOrderSet)
+	for accountID := range s.accountOrders {
+		delete(s.accountOrders, accountID)
+	}
 }
 
 // Stats returns statistics about tracked orders.
