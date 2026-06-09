@@ -548,7 +548,7 @@ func BenchmarkMatchOrder(b *testing.B) {
 	defer engine.Close()
 
 	// Pre-populate with resting orders
-	for i := int64(1); i <= 1000; i++ {
+	for i := int64(1); i <= int64(b.N); i++ {
 		order := &Order{
 			OrderID:      i,
 			AccountID:    fmt.Sprintf("ACC%d", i),
@@ -619,11 +619,11 @@ func BenchmarkSubmitOrderPreallocated(b *testing.B) {
 }
 
 func BenchmarkMatchOrderPreallocated(b *testing.B) {
-	engine := NewMatchingEngine(WithMatchingEngineOrderCapacity(b.N + 1000))
+	engine := NewMatchingEngine(WithMatchingEngineOrderCapacity(b.N))
 	defer engine.Close()
 
 	// Pre-populate with resting orders
-	for i := int64(1); i <= 1000; i++ {
+	for i := int64(1); i <= int64(b.N); i++ {
 		order := &Order{
 			OrderID:      i,
 			AccountID:    fmt.Sprintf("ACC%d", i),

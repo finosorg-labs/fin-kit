@@ -71,26 +71,53 @@ func (r *TradeReporter) RecordTrade(trade *Trade) (*ExecutionReport, *ExecutionR
 	reportTimestamp := trade.Timestamp
 
 	// Update buy side
-	buyReport, err := r.updateOrderState(trade.BuyOrderID, trade.Quantity, trade.Price, trade, reportTimestamp)
+	buyTracked, err := r.updateOrderState(trade.BuyOrderID, trade.Quantity, trade.Price, trade)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Update sell side
-	sellReport, err := r.updateOrderState(trade.SellOrderID, trade.Quantity, trade.Price, trade, reportTimestamp)
+	sellTracked, err := r.updateOrderState(trade.SellOrderID, trade.Quantity, trade.Price, trade)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Set fill types in trade
-	trade.BuyFillType = r.getFillType(buyReport)
-	trade.SellFillType = r.getFillType(sellReport)
+	trade.BuyFillType = r.getFillTypeFromStatus(buyTracked.Status)
+	trade.SellFillType = r.getFillTypeFromStatus(sellTracked.Status)
 
-	return buyReport, sellReport, nil
+	return r.executionReport(trade.BuyOrderID, buyTracked, reportTimestamp),
+		r.executionReport(trade.SellOrderID, sellTracked, reportTimestamp), nil
+}
+
+func (r *TradeReporter) recordTradeForOrder(trade *Trade, orderID int64) (*ExecutionReport, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.tradeCounter++
+	trade.TradeID = r.tradeCounter
+	trade.Timestamp = time.Now().UnixNano()
+
+	buyTracked, err := r.updateOrderState(trade.BuyOrderID, trade.Quantity, trade.Price, trade)
+	if err != nil {
+		return nil, err
+	}
+	sellTracked, err := r.updateOrderState(trade.SellOrderID, trade.Quantity, trade.Price, trade)
+	if err != nil {
+		return nil, err
+	}
+
+	trade.BuyFillType = r.getFillTypeFromStatus(buyTracked.Status)
+	trade.SellFillType = r.getFillTypeFromStatus(sellTracked.Status)
+
+	if orderID == trade.BuyOrderID {
+		return r.executionReport(orderID, buyTracked, trade.Timestamp), nil
+	}
+	return r.executionReport(orderID, sellTracked, trade.Timestamp), nil
 }
 
 // updateOrderState updates the order state after a trade.
-func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, trade *Trade, timestamp int64) (*ExecutionReport, error) {
+func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, trade *Trade) (*trackedOrder, error) {
 	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		return nil, ErrOrderNotFound
@@ -113,6 +140,10 @@ func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, 
 		tracked.Status = OrderStatusPartial
 	}
 
+	return tracked, nil
+}
+
+func (r *TradeReporter) executionReport(orderID int64, tracked *trackedOrder, timestamp int64) *ExecutionReport {
 	// Calculate average price
 	avgPrice := 0.0
 	if tracked.FilledQty > 0 {
@@ -128,7 +159,7 @@ func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, 
 		AvgPrice:     avgPrice,
 		Trades:       tracked.Trades,
 		Timestamp:    timestamp,
-	}, nil
+	}
 }
 
 // CancelOrder marks an order as canceled and generates an execution report.
@@ -276,7 +307,11 @@ func (r *TradeReporter) Clear() {
 
 // getFillType determines the fill type from an execution report.
 func (r *TradeReporter) getFillType(report *ExecutionReport) FillType {
-	switch report.Status {
+	return r.getFillTypeFromStatus(report.Status)
+}
+
+func (r *TradeReporter) getFillTypeFromStatus(status OrderStatus) FillType {
+	switch status {
 	case OrderStatusFilled:
 		return FillTypeComplete
 	case OrderStatusPartial:

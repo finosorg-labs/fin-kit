@@ -310,6 +310,22 @@ func BenchmarkOrderBookAddRemoveSameLevel(b *testing.B) {
 	}
 }
 
+func BenchmarkOrderBookAddRemoveEnginePath(b *testing.B) {
+	ob := NewOrderBook("BENCH", 1, NewSelfTradeCheck(), WithOrderCapacity(b.N), withoutSelfTradeTracking())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		orderID := int64(i + 1)
+		if err := ob.AddOrder(newBenchmarkExchangeOrder(orderID, 100000, SideBuy)); err != nil {
+			b.Fatalf("add order: %v", err)
+		}
+		if err := ob.RemoveOrder(orderID); err != nil {
+			b.Fatalf("remove order: %v", err)
+		}
+	}
+}
+
 func BenchmarkOrderBookUpdateOrder(b *testing.B) {
 	ob := seedBenchmarkExchangeOrderBook(b, 1000)
 

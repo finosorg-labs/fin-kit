@@ -143,17 +143,11 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 	// Record trades and generate execution reports
 	var finalReport *ExecutionReport
 	for _, trade := range trades {
-		buyReport, sellReport, err := e.tradeReporter.RecordTrade(trade)
+		report, err := e.tradeReporter.recordTradeForOrder(trade, order.OrderID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to record trade: %w", err)
 		}
-
-		// Determine which report belongs to the incoming order
-		if trade.BuyOrderID == order.OrderID {
-			finalReport = buyReport
-		} else if trade.SellOrderID == order.OrderID {
-			finalReport = sellReport
-		}
+		finalReport = report
 
 		// Update order book for matched resting orders
 		// Determine which is the resting order (not the incoming order)
