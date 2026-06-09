@@ -35,40 +35,37 @@ func (s *SignalGenerator) Generate(
 	liquidity *LiquidityMetrics,
 	timestamp int64,
 ) *Signal {
+	signal := &Signal{}
+	s.generateInto(imbalance, liquidity, timestamp, signal)
+	return signal
+}
+
+func (s *SignalGenerator) generateInto(
+	imbalance *ImbalanceMetrics,
+	liquidity *LiquidityMetrics,
+	timestamp int64,
+	out *Signal,
+) {
+	*out = Signal{Type: SignalHold, Timestamp: timestamp}
 	if imbalance == nil || liquidity == nil {
-		return &Signal{
-			Type:       SignalHold,
-			Strength:   0.0,
-			Confidence: 0.0,
-			Timestamp:  timestamp,
-		}
+		return
 	}
 
 	// Determine signal type based on order flow balance
-	var signalType SignalType
 	if imbalance.OrderFlowBalance > s.imbalanceThreshold {
-		signalType = SignalBuy
+		out.Type = SignalBuy
 	} else if imbalance.OrderFlowBalance < -s.imbalanceThreshold {
-		signalType = SignalSell
-	} else {
-		signalType = SignalHold
+		out.Type = SignalSell
 	}
 
 	// Calculate signal strength based on imbalance magnitude
-	strength := math.Abs(imbalance.OrderFlowBalance)
-	if strength > 1.0 {
-		strength = 1.0
+	out.Strength = math.Abs(imbalance.OrderFlowBalance)
+	if out.Strength > 1.0 {
+		out.Strength = 1.0
 	}
 
 	// Calculate confidence based on multiple factors
-	confidence := s.calculateConfidence(imbalance, liquidity)
-
-	return &Signal{
-		Type:       signalType,
-		Strength:   strength,
-		Confidence: confidence,
-		Timestamp:  timestamp,
-	}
+	out.Confidence = s.calculateConfidence(imbalance, liquidity)
 }
 
 // calculateConfidence computes signal confidence from multiple indicators.

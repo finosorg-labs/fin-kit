@@ -31,6 +31,14 @@ func TestNewHFTOrderBook(t *testing.T) {
 	defer ob.Close()
 }
 
+func TestNewHFTOrderBook_WithOrderCapacity(t *testing.T) {
+	ob := NewHFTOrderBook("TEST", 1, 0.01, WithOrderCapacity(100))
+	if ob == nil {
+		t.Fatal("NewHFTOrderBook returned nil")
+	}
+	defer ob.Close()
+}
+
 func TestHFTOrderBook_OnOrderUpdate_Insert(t *testing.T) {
 	ob := NewHFTOrderBook("TEST", 1, 0.01)
 	defer ob.Close()
@@ -227,7 +235,7 @@ func TestHFTOrderBook_GetCore(t *testing.T) {
 func seedBenchmarkHFTOrderBook(b *testing.B, levels int) *HFTOrderBook {
 	b.Helper()
 
-	ob := NewHFTOrderBook("BENCH", 1, 0.01)
+	ob := NewHFTOrderBook("BENCH", 1, 0.01, WithOrderCapacity(levels*2))
 	for i := 0; i < levels; i++ {
 		if _, err := ob.OnOrderUpdate(&OrderUpdate{
 			Type:      OrderUpdateInsert,
@@ -254,20 +262,22 @@ func seedBenchmarkHFTOrderBook(b *testing.B, levels int) *HFTOrderBook {
 }
 
 func BenchmarkHFTOrderBookOnOrderUpdateInsert(b *testing.B) {
-	ob := NewHFTOrderBook("BENCH", 1, 0.01)
+	ob := NewHFTOrderBook("BENCH", 1, 0.01, WithOrderCapacity(b.N))
 	defer ob.Close()
+
+	update := OrderUpdate{
+		Type:     OrderUpdateInsert,
+		Price:    100000,
+		Quantity: 100,
+		Side:     SideBuy,
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ob.OnOrderUpdate(&OrderUpdate{
-			Type:      OrderUpdateInsert,
-			OrderID:   int64(i + 1),
-			Price:     100000,
-			Quantity:  100,
-			Side:      SideBuy,
-			Timestamp: int64(i + 1),
-		})
+		update.OrderID = int64(i + 1)
+		update.Timestamp = int64(i + 1)
+		_, err := ob.OnOrderUpdate(&update)
 		if err != nil {
 			b.Fatalf("insert update: %v", err)
 		}
@@ -278,15 +288,17 @@ func BenchmarkHFTOrderBookOnOrderUpdateModify(b *testing.B) {
 	ob := seedBenchmarkHFTOrderBook(b, 1000)
 	defer ob.Close()
 
+	update := OrderUpdate{
+		Type:    OrderUpdateModify,
+		OrderID: 1,
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ob.OnOrderUpdate(&OrderUpdate{
-			Type:      OrderUpdateModify,
-			OrderID:   1,
-			Quantity:  int64(100 + (i & 1)),
-			Timestamp: int64(i + 1),
-		})
+		update.Quantity = int64(100 + (i & 1))
+		update.Timestamp = int64(i + 1)
+		_, err := ob.OnOrderUpdate(&update)
 		if err != nil {
 			b.Fatalf("modify update: %v", err)
 		}

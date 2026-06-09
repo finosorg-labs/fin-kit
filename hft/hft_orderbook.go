@@ -30,12 +30,51 @@ type HFTOrderBook struct {
 	lastUpdate    int64
 }
 
+// HFTOrderBookOption configures an HFT order book during creation.
+type HFTOrderBookOption func(*hftOrderBookConfig)
+
+type hftOrderBookConfig struct {
+	orderCapacity int
+}
+
+// WithOrderCapacity sets the expected active order capacity for HFT order book data structures.
+func WithOrderCapacity(capacity int) HFTOrderBookOption {
+	return func(cfg *hftOrderBookConfig) {
+		if capacity > 0 {
+			cfg.orderCapacity = capacity
+		}
+	}
+}
+
+func int64MapCapacity(expected int) int {
+	if expected <= 0 {
+		return 0
+	}
+	return expected*10/7 + 1
+}
+
+type depthSnapshot struct {
+	bestBid *PriceLevel
+	bestAsk *PriceLevel
+	bids    []*PriceLevel
+	asks    []*PriceLevel
+}
+
 // NewHFTOrderBook creates a new HFT order book instance.
-func NewHFTOrderBook(symbol string, symbolID uint32, tickSize float64) *HFTOrderBook {
-	core := coreob.NewOrderBook(symbol, symbolID, coreob.WithInitialCapacity(10000))
+func NewHFTOrderBook(symbol string, symbolID uint32, tickSize float64, opts ...HFTOrderBookOption) *HFTOrderBook {
+	cfg := hftOrderBookConfig{orderCapacity: 10000}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	core := coreob.NewOrderBook(symbol, symbolID, coreob.WithInitialCapacity(int64MapCapacity(cfg.orderCapacity)))
 	hft := &HFTOrderBook{
-		core:     core,
-		tickSize: tickSize,
+		core:          core,
+		tickSize:      tickSize,
+		lastImbalance: &ImbalanceMetrics{},
+		lastLiquidity: &LiquidityMetrics{},
+		lastSignal:    &Signal{Type: SignalHold},
+		lastRisk:      &RiskMetrics{},
 	}
 
 	// Initialize metrics calculators
@@ -80,34 +119,29 @@ func (h *HFTOrderBook) OnOrderUpdate(update *OrderUpdate) (*Signal, error) {
 
 	h.lastUpdate = update.Timestamp
 
-	// Calculate metrics in parallel
-	// Note: For sub-microsecond operations, goroutine overhead may exceed benefits.
-	// Benchmark to verify performance improvement in production workloads.
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		h.lastImbalance = h.imbalance.Calculate()
-	}()
-
-	go func() {
-		defer wg.Done()
-		h.lastLiquidity = h.liquidity.Calculate()
-	}()
-
-	wg.Wait()
+	depth := h.snapshotDepth(10)
+	h.imbalance.calculateFromDepth(&depth, 5, h.lastImbalance)
+	h.liquidity.calculateFromDepth(&depth, h.lastLiquidity)
 
 	// Generate signal (depends on both metrics)
-	h.lastSignal = h.signalGen.Generate(h.lastImbalance, h.lastLiquidity, update.Timestamp)
+	h.signalGen.generateInto(h.lastImbalance, h.lastLiquidity, update.Timestamp, h.lastSignal)
 
 	// Update risk metrics
-	h.lastRisk = h.risk.Calculate()
+	h.risk.calculateInto(h.lastRisk)
 
 	return h.lastSignal, nil
 }
 
 // GetImbalance returns the latest order book imbalance metrics.
+func (h *HFTOrderBook) snapshotDepth(depth int) depthSnapshot {
+	return depthSnapshot{
+		bestBid: h.core.GetBestBid(),
+		bestAsk: h.core.GetBestAsk(),
+		bids:    h.core.GetTopNBids(depth),
+		asks:    h.core.GetTopNAsks(depth),
+	}
+}
+
 func (h *HFTOrderBook) GetImbalance() *ImbalanceMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

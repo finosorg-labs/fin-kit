@@ -5,7 +5,6 @@ import (
 	"math"
 
 	coreob "github.com/finosorg-labs/exchange-c/orderbook"
-	"github.com/finosorg-labs/platform"
 )
 
 // OrderBookImbalance calculates order book imbalance metrics.
@@ -32,17 +31,34 @@ func (i *OrderBookImbalance) CalculateWithDepth(depth int) *ImbalanceMetrics {
 		depth = 5
 	}
 
-	core := i.orderbook.core
+	snapshot := depthSnapshot{
+		bestBid: i.orderbook.core.GetBestBid(),
+		bestAsk: i.orderbook.core.GetBestAsk(),
+		bids:    i.orderbook.core.GetTopNBids(depth),
+		asks:    i.orderbook.core.GetTopNAsks(depth),
+	}
+	metrics := &ImbalanceMetrics{}
+	i.calculateFromDepth(&snapshot, depth, metrics)
+	return metrics
+}
 
-	bestBid := core.GetBestBid()
-	bestAsk := core.GetBestAsk()
-
-	if bestBid == nil || bestAsk == nil {
-		return &ImbalanceMetrics{}
+func (i *OrderBookImbalance) calculateFromDepth(snapshot *depthSnapshot, depth int, out *ImbalanceMetrics) {
+	*out = ImbalanceMetrics{}
+	if depth <= 0 {
+		depth = 5
+	}
+	if snapshot.bestBid == nil || snapshot.bestAsk == nil {
+		return
 	}
 
-	bids := core.GetTopNBids(depth)
-	asks := core.GetTopNAsks(depth)
+	bids := snapshot.bids
+	if len(bids) > depth {
+		bids = bids[:depth]
+	}
+	asks := snapshot.asks
+	if len(asks) > depth {
+		asks = asks[:depth]
+	}
 
 	var bidQty, askQty int64
 	for _, level := range bids {
@@ -52,61 +68,15 @@ func (i *OrderBookImbalance) CalculateWithDepth(depth int) *ImbalanceMetrics {
 		askQty += level.TotalQty
 	}
 
-	var bidAskImbalance float64
-	if bidQty+askQty > 0 {
-		bidAskImbalance = float64(bidQty-askQty) / float64(bidQty+askQty)
+	totalQty := bidQty + askQty
+	if totalQty <= 0 {
+		return
 	}
 
-	// Calculate midPrice using BigFloat for precision
-	bidPrice, err := platform.NewBigFloat()
-	if err != nil {
-		return &ImbalanceMetrics{}
-	}
-	defer bidPrice.Destroy()
-
-	askPrice, err := platform.NewBigFloat()
-	if err != nil {
-		return &ImbalanceMetrics{}
-	}
-	defer askPrice.Destroy()
-
-	sum, err := platform.NewBigFloat()
-	if err != nil {
-		return &ImbalanceMetrics{}
-	}
-	defer sum.Destroy()
-
-	two, err := platform.NewBigFloat()
-	if err != nil {
-		return &ImbalanceMetrics{}
-	}
-	defer two.Destroy()
-
-	result, err := platform.NewBigFloat()
-	if err != nil {
-		return &ImbalanceMetrics{}
-	}
-	defer result.Destroy()
-
-	if err := bidPrice.SetInt64(bestBid.Price); err != nil {
-		return &ImbalanceMetrics{}
-	}
-	if err := askPrice.SetInt64(bestAsk.Price); err != nil {
-		return &ImbalanceMetrics{}
-	}
-	if err := sum.Add(bidPrice, askPrice); err != nil {
-		return &ImbalanceMetrics{}
-	}
-	if err := two.SetFloat64(2.0); err != nil {
-		return &ImbalanceMetrics{}
-	}
-	if err := result.Div(sum, two); err != nil {
-		return &ImbalanceMetrics{}
-	}
-
-	midPrice, err := result.Float64()
-	if err != nil {
-		return &ImbalanceMetrics{}
+	bidAskImbalance := float64(bidQty-askQty) / float64(totalQty)
+	midPrice := (float64(snapshot.bestBid.Price) + float64(snapshot.bestAsk.Price)) * 0.5
+	if midPrice <= 0 {
+		return
 	}
 
 	var weightedBidQty, weightedAskQty float64
@@ -130,19 +100,15 @@ func (i *OrderBookImbalance) CalculateWithDepth(depth int) *ImbalanceMetrics {
 
 	var pricePressure float64
 	if bidQty > askQty {
-		pricePressure = float64(bidQty) / float64(bidQty+askQty)
+		pricePressure = float64(bidQty) / float64(totalQty)
 	} else {
-		pricePressure = -float64(askQty) / float64(bidQty+askQty)
+		pricePressure = -float64(askQty) / float64(totalQty)
 	}
 
-	orderFlowBalance := (bidAskImbalance + volumeImbalance) / 2.0
-
-	return &ImbalanceMetrics{
-		BidAskImbalance:  bidAskImbalance,
-		VolumeImbalance:  volumeImbalance,
-		PricePressure:    pricePressure,
-		OrderFlowBalance: orderFlowBalance,
-	}
+	out.BidAskImbalance = bidAskImbalance
+	out.VolumeImbalance = volumeImbalance
+	out.PricePressure = pricePressure
+	out.OrderFlowBalance = (bidAskImbalance + volumeImbalance) * 0.5
 }
 
 // GetBestBid is a helper to access best bid from core.

@@ -24,58 +24,51 @@ func NewLiquidityAnalyzer(ob *HFTOrderBook, tickSize float64) *LiquidityAnalyzer
 // Calculate computes the current liquidity metrics.
 // Returns zero metrics if order book is empty or has no BBO.
 func (l *LiquidityAnalyzer) Calculate() *LiquidityMetrics {
-	core := l.orderbook.core
+	const topN = 10
+	snapshot := depthSnapshot{
+		bestBid: l.orderbook.core.GetBestBid(),
+		bestAsk: l.orderbook.core.GetBestAsk(),
+		bids:    l.orderbook.core.GetTopNBids(topN),
+		asks:    l.orderbook.core.GetTopNAsks(topN),
+	}
+	metrics := &LiquidityMetrics{}
+	l.calculateFromDepth(&snapshot, metrics)
+	return metrics
+}
 
-	// Get best bid and ask
-	bestBid := core.GetBestBid()
-	bestAsk := core.GetBestAsk()
-	if bestBid == nil || bestAsk == nil {
-		return &LiquidityMetrics{}
+func (l *LiquidityAnalyzer) calculateFromDepth(snapshot *depthSnapshot, out *LiquidityMetrics) {
+	*out = LiquidityMetrics{}
+	if snapshot.bestBid == nil || snapshot.bestAsk == nil {
+		return
 	}
 
-	// Get top N levels for depth analysis
-	const topN = 10
-	bids := core.GetTopNBids(topN)
-	asks := core.GetTopNAsks(topN)
-
-	// Calculate total depth
 	var bidDepth, askDepth int64
-	for _, level := range bids {
+	for _, level := range snapshot.bids {
 		bidDepth += level.TotalQty
 	}
-	for _, level := range asks {
+	for _, level := range snapshot.asks {
 		askDepth += level.TotalQty
 	}
 
-	// Spread in ticks
-	spread := bestAsk.Price - bestBid.Price
+	spread := snapshot.bestAsk.Price - snapshot.bestBid.Price
+	midPrice := (float64(snapshot.bestBid.Price) + float64(snapshot.bestAsk.Price)) * 0.5
 
-	// Mid price for percentage calculations
-	midPrice := float64(bestBid.Price+bestAsk.Price) / 2.0
-
-	// Spread in basis points (bps)
 	var spreadBPS float64
 	if midPrice > 0 {
 		spreadBPS = (float64(spread) / midPrice) * 10000.0
 	}
 
-	// Effective spread (average impact to trade both sides)
 	var effectiveSpread float64
-	if bidDepth > 0 && askDepth > 0 {
+	if bidDepth > 0 && askDepth > 0 && midPrice > 0 {
 		effectiveSpread = float64(spread) / midPrice
 	}
 
-	// Market impact (estimated for a standard order size)
-	marketImpact := l.calculateMarketImpact(bids, asks, l.standardQty, midPrice)
-
-	return &LiquidityMetrics{
-		BidDepth:        bidDepth,
-		AskDepth:        askDepth,
-		Spread:          spread,
-		SpreadBPS:       spreadBPS,
-		EffectiveSpread: effectiveSpread,
-		MarketImpact:    marketImpact,
-	}
+	out.BidDepth = bidDepth
+	out.AskDepth = askDepth
+	out.Spread = spread
+	out.SpreadBPS = spreadBPS
+	out.EffectiveSpread = effectiveSpread
+	out.MarketImpact = l.calculateMarketImpact(snapshot.bids, snapshot.asks, l.standardQty, midPrice)
 }
 
 // calculateMarketImpact estimates the price impact of executing a given quantity.

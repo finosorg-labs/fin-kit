@@ -30,6 +30,12 @@ func NewRiskMonitor(position *PositionTracker) *RiskMonitor {
 
 // Calculate computes current risk metrics.
 func (r *RiskMonitor) Calculate() *RiskMetrics {
+	metrics := &RiskMetrics{}
+	r.calculateInto(metrics)
+	return metrics
+}
+
+func (r *RiskMonitor) calculateInto(out *RiskMetrics) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -56,13 +62,11 @@ func (r *RiskMonitor) Calculate() *RiskMetrics {
 	// Expected profit (simple estimate based on unrealized PnL)
 	expectedProfit := r.position.GetUnrealizedPnL()
 
-	return &RiskMetrics{
-		Position:       position,
-		Exposure:       math.Abs(exposure),
-		MaxDrawdown:    r.maxDrawdown,
-		VaR:            varValue,
-		ExpectedProfit: expectedProfit,
-	}
+	out.Position = position
+	out.Exposure = math.Abs(exposure)
+	out.MaxDrawdown = r.maxDrawdown
+	out.VaR = varValue
+	out.ExpectedProfit = expectedProfit
 }
 
 // UpdatePriceHistory adds a new price to the historical data.
