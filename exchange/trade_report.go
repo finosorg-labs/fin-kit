@@ -7,6 +7,8 @@ package exchange
 import (
 	"sync"
 	"time"
+
+	hashsdk "github.com/finosorg-labs/hash-c/sdk"
 )
 
 // TradeReporter generates trade execution reports and tracks order fill status.
@@ -15,8 +17,8 @@ import (
 // Concurrency: Thread-safe via mutex.
 type TradeReporter struct {
 	mu           sync.RWMutex
-	orders       map[int64]*trackedOrder // orderID -> tracked order state
-	tradeCounter int64                   // Trade ID counter
+	orders       *hashsdk.Int64Map[*trackedOrder] // orderID -> tracked order state
+	tradeCounter int64                            // Trade ID counter
 }
 
 // trackedOrder maintains the state of an order for reporting purposes.
@@ -37,7 +39,7 @@ func NewTradeReporter() *TradeReporter {
 // NewTradeReporterWithCapacity creates a new trade reporter with pre-allocated order capacity.
 func NewTradeReporterWithCapacity(capacity int) *TradeReporter {
 	return &TradeReporter{
-		orders: make(map[int64]*trackedOrder, capacity),
+		orders: hashsdk.NewInt64MapWithCapacity[*trackedOrder](capacity),
 	}
 }
 
@@ -47,13 +49,13 @@ func (r *TradeReporter) RegisterOrder(order *Order) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.orders[order.OrderID] = &trackedOrder{
+	r.orders.Set(order.OrderID, &trackedOrder{
 		Order:        order,
 		Status:       OrderStatusNew,
 		FilledQty:    0,
 		RemainingQty: order.Quantity,
 		TotalValue:   0,
-	}
+	})
 }
 
 // RecordTrade records a trade and updates order fill status.
@@ -89,7 +91,7 @@ func (r *TradeReporter) RecordTrade(trade *Trade) (*ExecutionReport, *ExecutionR
 
 // updateOrderState updates the order state after a trade.
 func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, trade *Trade, timestamp int64) (*ExecutionReport, error) {
-	tracked, exists := r.orders[orderID]
+	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		return nil, ErrOrderNotFound
 	}
@@ -134,7 +136,7 @@ func (r *TradeReporter) CancelOrder(orderID int64, reason string) (*ExecutionRep
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	tracked, exists := r.orders[orderID]
+	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		return nil, ErrOrderNotFound
 	}
@@ -165,7 +167,7 @@ func (r *TradeReporter) RejectOrder(orderID int64, reason string) (*ExecutionRep
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	tracked, exists := r.orders[orderID]
+	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		// Order was never registered, create minimal report
 		return &ExecutionReport{
@@ -200,7 +202,7 @@ func (r *TradeReporter) GetOrderReport(orderID int64) (*ExecutionReport, error) 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	tracked, exists := r.orders[orderID]
+	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		return nil, ErrOrderNotFound
 	}
@@ -229,7 +231,7 @@ func (r *TradeReporter) UnregisterOrder(orderID int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	delete(r.orders, orderID)
+	r.orders.Delete(orderID)
 }
 
 // UpdateRemainingQty updates the remaining quantity for an order.
@@ -238,7 +240,7 @@ func (r *TradeReporter) UpdateRemainingQty(orderID int64, remaining int64, cance
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	tracked, exists := r.orders[orderID]
+	tracked, exists := r.orders.Get(orderID)
 	if !exists {
 		return ErrOrderNotFound
 	}
@@ -255,9 +257,7 @@ func (r *TradeReporter) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for orderID := range r.orders {
-		delete(r.orders, orderID)
-	}
+	r.orders.Clear()
 	r.tradeCounter = 0
 }
 
@@ -291,11 +291,11 @@ func (r *TradeReporter) GetStats() TradeReporterStats {
 	defer r.mu.RUnlock()
 
 	stats := TradeReporterStats{
-		TotalOrders: len(r.orders),
+		TotalOrders: r.orders.Len(),
 		TotalTrades: r.tradeCounter,
 	}
 
-	for _, tracked := range r.orders {
+	r.orders.ForEach(func(_ int64, tracked *trackedOrder) bool {
 		switch tracked.Status {
 		case OrderStatusNew, OrderStatusPartial:
 			stats.ActiveOrders++
@@ -306,7 +306,8 @@ func (r *TradeReporter) GetStats() TradeReporterStats {
 		case OrderStatusRejected:
 			stats.RejectedOrders++
 		}
-	}
+		return true
+	})
 
 	return stats
 }
