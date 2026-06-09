@@ -522,11 +522,16 @@ func BenchmarkSubmitOrder(b *testing.B) {
 		engine.SubmitOrder(order)
 	}
 
+	accounts := make([]string, b.N)
+	for i := range accounts {
+		accounts[i] = fmt.Sprintf("BENCH%d", i)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		order := &Order{
 			OrderID:      int64(1000 + i),
-			AccountID:    fmt.Sprintf("BENCH%d", i),
+			AccountID:    accounts[i],
 			Price:        95,
 			Quantity:     5,
 			Side:         SideSell,
@@ -556,11 +561,16 @@ func BenchmarkMatchOrder(b *testing.B) {
 		engine.SubmitOrder(order)
 	}
 
+	accounts := make([]string, b.N)
+	for i := range accounts {
+		accounts[i] = fmt.Sprintf("BENCH%d", i)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		order := &Order{
 			OrderID:      int64(10000 + i),
-			AccountID:    fmt.Sprintf("BENCH%d", i),
+			AccountID:    accounts[i],
 			Price:        100,
 			Quantity:     10,
 			Side:         SideBuy,
@@ -588,11 +598,16 @@ func BenchmarkSubmitOrderPreallocated(b *testing.B) {
 		engine.SubmitOrder(order)
 	}
 
+	accounts := make([]string, b.N)
+	for i := range accounts {
+		accounts[i] = fmt.Sprintf("BENCH%d", i)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		order := &Order{
 			OrderID:      int64(1000 + i),
-			AccountID:    fmt.Sprintf("BENCH%d", i),
+			AccountID:    accounts[i],
 			Price:        95,
 			Quantity:     5,
 			Side:         SideSell,
@@ -621,11 +636,16 @@ func BenchmarkMatchOrderPreallocated(b *testing.B) {
 		engine.SubmitOrder(order)
 	}
 
+	accounts := make([]string, b.N)
+	for i := range accounts {
+		accounts[i] = fmt.Sprintf("BENCH%d", i)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		order := &Order{
 			OrderID:      int64(10000 + i),
-			AccountID:    fmt.Sprintf("BENCH%d", i),
+			AccountID:    accounts[i],
 			Price:        100,
 			Quantity:     10,
 			Side:         SideBuy,

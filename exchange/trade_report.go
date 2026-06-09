@@ -66,15 +66,16 @@ func (r *TradeReporter) RecordTrade(trade *Trade) (*ExecutionReport, *ExecutionR
 	r.tradeCounter++
 	trade.TradeID = r.tradeCounter
 	trade.Timestamp = time.Now().UnixNano()
+	reportTimestamp := trade.Timestamp
 
 	// Update buy side
-	buyReport, err := r.updateOrderState(trade.BuyOrderID, trade.Quantity, trade.Price, trade)
+	buyReport, err := r.updateOrderState(trade.BuyOrderID, trade.Quantity, trade.Price, trade, reportTimestamp)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Update sell side
-	sellReport, err := r.updateOrderState(trade.SellOrderID, trade.Quantity, trade.Price, trade)
+	sellReport, err := r.updateOrderState(trade.SellOrderID, trade.Quantity, trade.Price, trade, reportTimestamp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -87,7 +88,7 @@ func (r *TradeReporter) RecordTrade(trade *Trade) (*ExecutionReport, *ExecutionR
 }
 
 // updateOrderState updates the order state after a trade.
-func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, trade *Trade) (*ExecutionReport, error) {
+func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, trade *Trade, timestamp int64) (*ExecutionReport, error) {
 	tracked, exists := r.orders[orderID]
 	if !exists {
 		return nil, ErrOrderNotFound
@@ -124,7 +125,7 @@ func (r *TradeReporter) updateOrderState(orderID int64, qty int64, price int64, 
 		RemainingQty: tracked.RemainingQty,
 		AvgPrice:     avgPrice,
 		Trades:       tracked.Trades,
-		Timestamp:    time.Now().UnixNano(),
+		Timestamp:    timestamp,
 	}, nil
 }
 
