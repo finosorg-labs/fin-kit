@@ -33,13 +33,15 @@ type OrderBook struct {
 	symbolID       uint32
 	selfTradeCheck *SelfTradeCheck
 	orderAccounts  *hashsdk.Int64Map[string] // orderID -> accountID mapping
+	trackSelfTrade bool
 }
 
 // OrderBookOption configures an exchange order book during creation.
 type OrderBookOption func(*orderBookConfig)
 
 type orderBookConfig struct {
-	orderCapacity int
+	orderCapacity  int
+	trackSelfTrade bool
 }
 
 // WithOrderCapacity sets the expected active order capacity for internal maps.
@@ -51,9 +53,15 @@ func WithOrderCapacity(capacity int) OrderBookOption {
 	}
 }
 
+func withoutSelfTradeTracking() OrderBookOption {
+	return func(cfg *orderBookConfig) {
+		cfg.trackSelfTrade = false
+	}
+}
+
 // NewOrderBook creates a new exchange order book.
 func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck, opts ...OrderBookOption) *OrderBook {
-	cfg := orderBookConfig{}
+	cfg := orderBookConfig{trackSelfTrade: true}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
@@ -74,6 +82,7 @@ func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck
 		symbolID:       symbolID,
 		selfTradeCheck: selfTradeCheck,
 		orderAccounts:  orderAccounts,
+		trackSelfTrade: cfg.trackSelfTrade,
 	}
 }
 
@@ -104,8 +113,9 @@ func (ob *OrderBook) AddOrder(order *Order) error {
 	// Track account mapping
 	ob.orderAccounts.Set(order.OrderID, order.AccountID)
 
-	// Register for self-trade prevention
-	ob.selfTradeCheck.RegisterOrder(order.OrderID, order.AccountID, order.Side)
+	if ob.trackSelfTrade {
+		ob.selfTradeCheck.RegisterOrder(order.OrderID, order.AccountID, order.Side)
+	}
 
 	return nil
 }
@@ -126,8 +136,9 @@ func (ob *OrderBook) RemoveOrder(orderID int64) error {
 		return err
 	}
 
-	// Unregister from self-trade prevention
-	ob.selfTradeCheck.UnregisterOrder(orderID, accountID)
+	if ob.trackSelfTrade {
+		ob.selfTradeCheck.UnregisterOrder(orderID, accountID)
+	}
 
 	// Remove account mapping
 	ob.orderAccounts.Delete(orderID)

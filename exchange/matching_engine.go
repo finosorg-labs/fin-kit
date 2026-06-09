@@ -327,7 +327,7 @@ func (e *MatchingEngine) getOrCreateOrderBook(order *Order) (*OrderBook, error) 
 
 	// Create new order book
 	symbolID := uint32(len(e.orderBooks) + 1)
-	ob = NewOrderBook(symbol, symbolID, e.selfTradeCheck, WithOrderCapacity(e.orderCapacity))
+	ob = NewOrderBook(symbol, symbolID, e.selfTradeCheck, WithOrderCapacity(e.orderCapacity), withoutSelfTradeTracking())
 	e.orderBooks[symbol] = ob
 
 	return ob, nil
