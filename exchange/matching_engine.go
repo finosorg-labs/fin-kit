@@ -191,8 +191,8 @@ func (e *MatchingEngine) SubmitOrder(order *Order) (*ExecutionReport, error) {
 	}
 	// Return execution report
 	if finalReport == nil {
-		// No trades generated, return current order state
-		return e.tradeReporter.GetOrderReport(order.OrderID)
+		// No trades generated, return accepted order state
+		return e.tradeReporter.newOrderReport(order), nil
 	}
 
 	return finalReport, nil

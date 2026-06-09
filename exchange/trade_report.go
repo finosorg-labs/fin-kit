@@ -197,6 +197,19 @@ func (r *TradeReporter) RejectOrder(orderID int64, reason string) (*ExecutionRep
 	}, nil
 }
 
+func (r *TradeReporter) newOrderReport(order *Order) *ExecutionReport {
+	return &ExecutionReport{
+		OrderID:      order.OrderID,
+		AccountID:    order.AccountID,
+		Status:       OrderStatusNew,
+		FilledQty:    order.FilledQty,
+		RemainingQty: order.RemainingQty,
+		AvgPrice:     0,
+		Trades:       nil,
+		Timestamp:    order.Timestamp,
+	}
+}
+
 // GetOrderReport returns the current execution report for an order.
 func (r *TradeReporter) GetOrderReport(orderID int64) (*ExecutionReport, error) {
 	r.mu.RLock()
