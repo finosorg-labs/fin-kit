@@ -44,6 +44,13 @@ type orderBookConfig struct {
 	trackSelfTrade bool
 }
 
+func int64MapCapacity(expected int) int {
+	if expected <= 0 {
+		return 0
+	}
+	return expected*10/7 + 1
+}
+
 // WithOrderCapacity sets the expected active order capacity for internal maps.
 func WithOrderCapacity(capacity int) OrderBookOption {
 	return func(cfg *orderBookConfig) {
@@ -68,12 +75,12 @@ func NewOrderBook(symbol string, symbolID uint32, selfTradeCheck *SelfTradeCheck
 
 	coreOpts := []coreob.Option(nil)
 	if cfg.orderCapacity > 0 {
-		coreOpts = append(coreOpts, coreob.WithInitialCapacity(cfg.orderCapacity))
+		coreOpts = append(coreOpts, coreob.WithInitialCapacity(int64MapCapacity(cfg.orderCapacity)))
 	}
 
 	orderAccounts := hashsdk.NewInt64Map[string]()
 	if cfg.orderCapacity > 0 {
-		orderAccounts = hashsdk.NewInt64MapWithCapacity[string](cfg.orderCapacity)
+		orderAccounts = hashsdk.NewInt64MapWithCapacity[string](int64MapCapacity(cfg.orderCapacity))
 	}
 
 	return &OrderBook{

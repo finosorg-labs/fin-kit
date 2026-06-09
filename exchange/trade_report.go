@@ -39,7 +39,7 @@ func NewTradeReporter() *TradeReporter {
 // NewTradeReporterWithCapacity creates a new trade reporter with pre-allocated order capacity.
 func NewTradeReporterWithCapacity(capacity int) *TradeReporter {
 	return &TradeReporter{
-		orders: hashsdk.NewInt64MapWithCapacity[*trackedOrder](capacity),
+		orders: hashsdk.NewInt64MapWithCapacity[*trackedOrder](int64MapCapacity(capacity)),
 	}
 }
 
