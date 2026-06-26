@@ -25,21 +25,28 @@ func NewPositionTracker() *PositionTracker {
 }
 
 // UpdatePosition updates the position with a new trade.
-func (p *PositionTracker) UpdatePosition(side Side, quantity int64, price float64) {
+// Returns error if BigFloat operations fail (memory allocation errors).
+func (p *PositionTracker) UpdatePosition(side Side, quantity int64, price float64) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	var err error
 	if side == SideBuy {
-		p.updateBuy(quantity, price)
+		err = p.updateBuy(quantity, price)
 	} else {
-		p.updateSell(quantity, price)
+		err = p.updateSell(quantity, price)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	p.totalVolume += quantity
+	return nil
 }
 
 // updateBuy processes a buy trade.
-func (p *PositionTracker) updateBuy(quantity int64, price float64) {
+func (p *PositionTracker) updateBuy(quantity int64, price float64) error {
 	p.longVolume += quantity
 
 	if p.position < 0 {
@@ -61,104 +68,105 @@ func (p *PositionTracker) updateBuy(quantity int64, price float64) {
 		} else if p.position == 0 {
 			p.avgEntryPrice = 0.0
 		}
-	} else {
-		// Adding to long or opening long
-		// Use BigFloat for precision
-		posVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer posVal.Destroy()
+		return nil
+	}
 
-		avgPrice, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer avgPrice.Destroy()
+	// Adding to long or opening long - use BigFloat for precision
+	posVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer posVal.Destroy()
 
-		qtyVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer qtyVal.Destroy()
+	avgPrice, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer avgPrice.Destroy()
 
-		priceVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer priceVal.Destroy()
+	qtyVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer qtyVal.Destroy()
 
-		cost1, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer cost1.Destroy()
+	priceVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer priceVal.Destroy()
 
-		cost2, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer cost2.Destroy()
+	cost1, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer cost1.Destroy()
 
-		totalCost, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer totalCost.Destroy()
+	cost2, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer cost2.Destroy()
 
-		newPos, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer newPos.Destroy()
+	totalCost, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer totalCost.Destroy()
 
-		result, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer result.Destroy()
+	newPos, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer newPos.Destroy()
 
-		if err := posVal.SetInt64(p.position); err != nil {
-			return
-		}
-		if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
-			return
-		}
-		if err := qtyVal.SetInt64(quantity); err != nil {
-			return
-		}
-		if err := priceVal.SetFloat64(price); err != nil {
-			return
-		}
+	result, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer result.Destroy()
 
-		// totalCost = position * avgEntryPrice + quantity * price
-		if err := cost1.Mul(posVal, avgPrice); err != nil {
-			return
-		}
-		if err := cost2.Mul(qtyVal, priceVal); err != nil {
-			return
-		}
-		if err := totalCost.Add(cost1, cost2); err != nil {
-			return
-		}
+	if err := posVal.SetInt64(p.position); err != nil {
+		return err
+	}
+	if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
+		return err
+	}
+	if err := qtyVal.SetInt64(quantity); err != nil {
+		return err
+	}
+	if err := priceVal.SetFloat64(price); err != nil {
+		return err
+	}
 
-		p.position += quantity
-		if p.position > 0 {
-			if err := newPos.SetInt64(p.position); err != nil {
-				return
-			}
-			if err := result.Div(totalCost, newPos); err != nil {
-				return
-			}
-			if p.avgEntryPrice, err = result.Float64(); err != nil {
-				return
-			}
+	// totalCost = position * avgEntryPrice + quantity * price
+	if err := cost1.Mul(posVal, avgPrice); err != nil {
+		return err
+	}
+	if err := cost2.Mul(qtyVal, priceVal); err != nil {
+		return err
+	}
+	if err := totalCost.Add(cost1, cost2); err != nil {
+		return err
+	}
+
+	p.position += quantity
+	if p.position > 0 {
+		if err := newPos.SetInt64(p.position); err != nil {
+			return err
+		}
+		if err := result.Div(totalCost, newPos); err != nil {
+			return err
+		}
+		if p.avgEntryPrice, err = result.Float64(); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // updateSell processes a sell trade.
-func (p *PositionTracker) updateSell(quantity int64, price float64) {
+func (p *PositionTracker) updateSell(quantity int64, price float64) error {
 	p.shortVolume += quantity
 
 	if p.position > 0 {
@@ -180,100 +188,101 @@ func (p *PositionTracker) updateSell(quantity int64, price float64) {
 		} else if p.position == 0 {
 			p.avgEntryPrice = 0.0
 		}
-	} else {
-		// Adding to short or opening short
-		// Use BigFloat for precision
-		posVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer posVal.Destroy()
+		return nil
+	}
 
-		avgPrice, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer avgPrice.Destroy()
+	// Adding to short or opening short - use BigFloat for precision
+	posVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer posVal.Destroy()
 
-		qtyVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer qtyVal.Destroy()
+	avgPrice, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer avgPrice.Destroy()
 
-		priceVal, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer priceVal.Destroy()
+	qtyVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer qtyVal.Destroy()
 
-		cost1, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer cost1.Destroy()
+	priceVal, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer priceVal.Destroy()
 
-		cost2, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer cost2.Destroy()
+	cost1, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer cost1.Destroy()
 
-		totalCost, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer totalCost.Destroy()
+	cost2, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer cost2.Destroy()
 
-		newPos, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer newPos.Destroy()
+	totalCost, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer totalCost.Destroy()
 
-		result, err := platform.NewBigFloat()
-		if err != nil {
-			return
-		}
-		defer result.Destroy()
+	newPos, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer newPos.Destroy()
 
-		if err := posVal.SetInt64(-p.position); err != nil {
-			return
-		}
-		if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
-			return
-		}
-		if err := qtyVal.SetInt64(quantity); err != nil {
-			return
-		}
-		if err := priceVal.SetFloat64(price); err != nil {
-			return
-		}
+	result, err := platform.NewBigFloat()
+	if err != nil {
+		return err
+	}
+	defer result.Destroy()
 
-		// totalCost = -position * avgEntryPrice + quantity * price
-		if err := cost1.Mul(posVal, avgPrice); err != nil {
-			return
-		}
-		if err := cost2.Mul(qtyVal, priceVal); err != nil {
-			return
-		}
-		if err := totalCost.Add(cost1, cost2); err != nil {
-			return
-		}
+	if err := posVal.SetInt64(-p.position); err != nil {
+		return err
+	}
+	if err := avgPrice.SetFloat64(p.avgEntryPrice); err != nil {
+		return err
+	}
+	if err := qtyVal.SetInt64(quantity); err != nil {
+		return err
+	}
+	if err := priceVal.SetFloat64(price); err != nil {
+		return err
+	}
 
-		p.position -= quantity
-		if p.position < 0 {
-			if err := newPos.SetInt64(-p.position); err != nil {
-				return
-			}
-			if err := result.Div(totalCost, newPos); err != nil {
-				return
-			}
-			if p.avgEntryPrice, err = result.Float64(); err != nil {
-				return
-			}
+	// totalCost = -position * avgEntryPrice + quantity * price
+	if err := cost1.Mul(posVal, avgPrice); err != nil {
+		return err
+	}
+	if err := cost2.Mul(qtyVal, priceVal); err != nil {
+		return err
+	}
+	if err := totalCost.Add(cost1, cost2); err != nil {
+		return err
+	}
+
+	p.position -= quantity
+	if p.position < 0 {
+		if err := newPos.SetInt64(-p.position); err != nil {
+			return err
+		}
+		if err := result.Div(totalCost, newPos); err != nil {
+			return err
+		}
+		if p.avgEntryPrice, err = result.Float64(); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // UpdateUnrealizedPnL updates the unrealized PnL based on current market price.

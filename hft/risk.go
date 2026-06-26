@@ -87,10 +87,21 @@ func (r *RiskMonitor) calculateVaR() float64 {
 		return 0.0
 	}
 
-	// Calculate returns
-	returns := make([]float64, len(r.priceHistory)-1)
+	// Calculate returns with zero-division protection
+	returns := make([]float64, 0, len(r.priceHistory)-1)
 	for i := 1; i < len(r.priceHistory); i++ {
-		returns[i-1] = (r.priceHistory[i] - r.priceHistory[i-1]) / r.priceHistory[i-1]
+		prevPrice := r.priceHistory[i-1]
+		if prevPrice == 0 {
+			// Skip zero prices to avoid division by zero
+			continue
+		}
+		ret := (r.priceHistory[i] - prevPrice) / prevPrice
+		returns = append(returns, ret)
+	}
+
+	// Need at least 2 valid returns for VaR calculation
+	if len(returns) < 2 {
+		return 0.0
 	}
 
 	// Sort returns
@@ -117,7 +128,12 @@ func (r *RiskMonitor) calculateVaR() float64 {
 	var varValue float64
 	if position != 0 && len(r.priceHistory) > 0 {
 		currentPrice := r.priceHistory[len(r.priceHistory)-1]
-		varValue = math.Abs(varReturn * currentPrice * float64(position))
+		if currentPrice > 0 {
+			varValue = math.Abs(varReturn * currentPrice * float64(position))
+		} else {
+			// Fallback to exposure-based calculation if current price is zero
+			varValue = math.Abs(varReturn * exposure)
+		}
 	} else {
 		varValue = math.Abs(varReturn * exposure)
 	}

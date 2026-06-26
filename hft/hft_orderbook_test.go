@@ -19,9 +19,7 @@ func TestNewHFTOrderBook(t *testing.T) {
 	if ob.liquidity == nil {
 		t.Error("liquidity analyzer is nil")
 	}
-	if ob.signalGen == nil {
-		t.Error("signal generator is nil")
-	}
+	// signalEngine can be nil (optional, will fallback to simple signal generation)
 	if ob.position == nil {
 		t.Error("position tracker is nil")
 	}
