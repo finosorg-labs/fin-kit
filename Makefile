@@ -30,7 +30,7 @@ clean:
 	rm -rf build
 
 sync:
-	@echo "==> Syncing all submodules to latest remote state (serial mode)"
+	@echo "==> Syncing all submodules to latest remote state (single level, serial mode)"
 	@echo "==> Step 1: Clean up removed submodules from git index"
 	@git ls-files -s | grep '^160000' | awk '{print $$4}' | while read path; do \
 		if ! git config -f .gitmodules --get-regexp "submodule\..*\.path" | grep -q "$$path$$"; then \
@@ -39,7 +39,7 @@ sync:
 		fi; \
 	done
 	@echo "==> Step 2: Sync submodule URLs from .gitmodules to .git/config"
-	@git submodule sync --recursive
+	@git submodule sync
 	@echo "==> Step 3: Register missing submodules to git index"
 	@git config -f .gitmodules --get-regexp '^submodule\..*\.path$$' | cut -d' ' -f2 | while read submodule_path; do \
 		if ! git ls-files -s "$$submodule_path" | grep -q '^160000'; then \
@@ -51,8 +51,8 @@ sync:
 			fi; \
 		fi; \
 	done
-	@echo "==> Step 4: Initialize all submodules (serial, --jobs 1)"
-	@git submodule update --init --recursive --jobs 1
+	@echo "==> Step 4: Initialize all submodules (single level, serial, --jobs 1)"
+	@git submodule update --init --jobs 1
 	@echo "==> Step 5: Update each submodule to latest remote state (serial processing)"
 	@git config -f .gitmodules --get-regexp '^submodule\..*\.path$$' | cut -d' ' -f2 | while read submodule_path; do \
 		if [ -d "$$submodule_path" ]; then \
@@ -69,13 +69,7 @@ sync:
 				git pull origin $$branch 2>/dev/null || git pull origin main && \
 				echo "  Resetting to remote state..." && \
 				git reset --hard HEAD && \
-				git clean -fd && \
-				echo "  Processing nested submodules..." && \
-				if [ -f .gitmodules ]; then \
-					git submodule sync --recursive && \
-					git submodule update --init --recursive --jobs 1 && \
-					git submodule foreach --recursive 'git fetch origin && git checkout main && git pull origin main && git reset --hard HEAD && git clean -fd' || true; \
-				fi \
+				git clean -fd \
 			) || echo "  Warning: Failed to update $$submodule_path, continuing..."; \
 			sleep 1; \
 		fi; \
@@ -85,10 +79,10 @@ sync:
 	@git config -f .gitmodules --get-regexp '^submodule\..*\.path$$' | cut -d' ' -f2 | while read path; do \
 		[ -d "$$path" ] && git add "$$path" 2>/dev/null || true; \
 	done
-	@echo "==> Submodules synced to latest state successfully"
+	@echo "==> Submodules synced to latest state successfully (single level only)"
 	@echo ""
 	@echo "Submodule status:"
-	@git submodule status --recursive
+	@git submodule status
 
 help:
 	@echo "fin-kit Makefile" && \
